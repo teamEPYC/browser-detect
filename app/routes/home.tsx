@@ -1,13 +1,19 @@
-import type { Route } from "./+types/home";
-import { Welcome } from "../welcome/welcome";
-
-export function meta({}: Route.MetaArgs) {
-  return [
-    { title: "New React Router App" },
-    { name: "description", content: "Welcome to React Router!" },
-  ];
-}
+import Header from "../components/Header";
+import HeroBanner from "../components/HeroBanner";
+import WhyBuild from "../components/WhyBuild";
+import HowItWorks from "../components/HowItWorks";
+import Footer from "../components/Footer";
 
 export default function Home() {
-  return <Welcome />;
+    return (
+        <div className="min-h-screen bg-background">
+            <Header />
+            <main>
+                <HeroBanner />
+                <WhyBuild />
+                <HowItWorks />
+            </main>
+            <Footer />
+        </div>
+    );
 }
