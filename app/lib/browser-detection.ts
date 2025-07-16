@@ -83,6 +83,7 @@ export interface ComprehensiveBrowserDetails {
     longitude: number;
     accuracy: number;
     timestamp: number;
+    locationName?: string;
   };
   
   // Page Context
@@ -258,7 +259,10 @@ export class BrowserDetector {
     
     if (userAgent.includes("Windows")) {
       os = "Windows";
-      if (userAgent.includes("Windows NT 10.0")) osVersion = "10";
+      if (userAgent.includes("Windows NT 10.0")) {
+        // Enhanced Windows 11 detection
+        osVersion = this.detectWindows11() ? "11" : "10";
+      }
       else if (userAgent.includes("Windows NT 6.3")) osVersion = "8.1";
       else if (userAgent.includes("Windows NT 6.2")) osVersion = "8";
       else if (userAgent.includes("Windows NT 6.1")) osVersion = "7";
@@ -279,6 +283,50 @@ export class BrowserDetector {
     }
     
     return { os, osVersion, platform: navigator.platform };
+  }
+
+  private detectWindows11(): boolean {
+    try {
+      // Method 1: Check for Windows 11 specific user agent hints
+      if ('userAgentData' in navigator) {
+        const uaData = (navigator as any).userAgentData;
+        if (uaData && uaData.getHighEntropyValues) {
+          // This is async, but we'll try sync detection first
+          // Could be enhanced with async detection later
+        }
+      }
+
+      // Method 2: Check for Windows 11 indicators in user agent
+      const userAgent = navigator.userAgent;
+      
+      // Windows 11 sometimes includes specific build numbers or identifiers
+      if (userAgent.includes('Windows NT 10.0') && userAgent.includes('22000')) {
+        return true; // Windows 11 build 22000+
+      }
+
+      // Method 3: Check for modern browser versions that typically run on Windows 11
+      // This is heuristic-based and not 100% reliable
+      const isModernChrome = userAgent.includes('Chrome') && 
+        parseInt(userAgent.match(/Chrome\/(\d+)/)?.[1] || '0') >= 96;
+      
+      const hasHighDPI = window.devicePixelRatio >= 1.25;
+      const hasModernFeatures = 'MediaQueryList' in window && 'matches' in MediaQueryList.prototype;
+      
+      // Heuristic: Newer systems with modern browsers and high DPI are more likely Windows 11
+      // This is not definitive but provides a better guess
+      if (isModernChrome && hasHighDPI && hasModernFeatures) {
+        // Additional check: Windows 11 typically has newer hardware
+        const hasManyLogicalProcessors = navigator.hardwareConcurrency >= 8;
+        if (hasManyLogicalProcessors) {
+          return true; // Likely Windows 11
+        }
+      }
+
+      return false; // Default to Windows 10
+    } catch (error) {
+      console.warn('Windows 11 detection failed:', error);
+      return false;
+    }
   }
   
   private getArchitecture(): string {
@@ -514,7 +562,7 @@ export class BrowserDetector {
     }
   }
   
-  private getGeolocation(): Promise<{ latitude: number; longitude: number; accuracy: number; timestamp: number }> {
+  private getGeolocation(): Promise<{ latitude: number; longitude: number; accuracy: number; timestamp: number; locationName?: string }> {
     return new Promise((resolve, reject) => {
       if (!navigator.geolocation) {
         reject(new Error('Geolocation not supported'));
@@ -522,17 +570,53 @@ export class BrowserDetector {
       }
       
       navigator.geolocation.getCurrentPosition(
-        (position) => {
-          resolve({
+        async (position) => {
+          const coords = {
             latitude: position.coords.latitude,
             longitude: position.coords.longitude,
             accuracy: position.coords.accuracy,
             timestamp: position.timestamp
-          });
+          };
+
+          // Try to get location name using reverse geocoding
+          try {
+            const locationName = await this.reverseGeocode(coords.latitude, coords.longitude);
+            resolve({ ...coords, locationName });
+          } catch (error) {
+            console.warn('Reverse geocoding failed:', error);
+            resolve(coords); // Return without location name if reverse geocoding fails
+          }
         },
         (error) => reject(error),
         { timeout: 5000, enableHighAccuracy: true }
       );
     });
+  }
+
+  private async reverseGeocode(latitude: number, longitude: number): Promise<string> {
+    try {
+      // Using a free reverse geocoding service
+      const response = await fetch(
+        `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=en`
+      );
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log('🌍 Reverse geocoding response:', data); // Debug log
+        
+        // Build location string from locality (city), state, country
+        const parts = [];
+        if (data.locality) parts.push(data.locality);
+        if (data.principalSubdivision) parts.push(data.principalSubdivision);
+        if (data.countryName) parts.push(data.countryName);
+        
+        return parts.length > 0 ? parts.join(', ') : 'Unknown Location';
+      }
+      
+      throw new Error('Reverse geocoding API failed');
+    } catch (error) {
+      console.warn('Could not get location name:', error);
+      return 'Unknown Location';
+    }
   }
 } 

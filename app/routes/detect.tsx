@@ -4,6 +4,7 @@ import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { saveBrowserDetection, getBrowserDetection } from "../lib/database";
 import { BrowserDetector, type ComprehensiveBrowserDetails } from "../lib/browser-detection";
+import { CopyIcon, MailIcon, HomeIcon } from "../components/icons";
 import { useState, useCallback, useRef } from "react";
 
 // Loader function - runs before component renders
@@ -21,7 +22,7 @@ export async function loader({ params }: LoaderFunctionArgs) {
                     data: existingDetection.detection_data,
                     id: existingDetection.id,
                     created_at: existingDetection.created_at,
-                    shareableUrl: `${typeof window !== 'undefined' ? window.location.origin : ''}/detect/${id}`
+                    shareableUrl: `/detect/${id}` // Will be fixed on client-side
                 };
             } else {
                 console.log('⚠️ Detection not found, will create new one');
@@ -47,39 +48,47 @@ declare global {
 export default function Detect() {
     const loaderData = useLoaderData<typeof loader>();
     const navigate = useNavigate();
-    
+
     // Protection flags
     const collectionStartedRef = useRef(false);
     const isCollectingRef = useRef(false);
-    
+
     // Initialize state - for existing detections, set data immediately
     const [browserDetails, setBrowserDetails] = useState<ComprehensiveBrowserDetails | null>(
         loaderData.type === 'existing' ? loaderData.data as ComprehensiveBrowserDetails : null
     );
-    
+
     // Initialize and start collection for new detections
     const [, setInitialized] = useState(() => {
         // Only run on client-side for new detections
-        if (typeof window !== 'undefined' && 
-            loaderData.type === 'new' && 
-            !collectionStartedRef.current && 
+        if (typeof window !== 'undefined' &&
+            loaderData.type === 'new' &&
+            !collectionStartedRef.current &&
             !window.browserDetectionInProgress) {
-            
+
             // Set protection flags immediately
             collectionStartedRef.current = true;
             isCollectingRef.current = true;
             window.browserDetectionInProgress = true;
-            
+
             // Start collection asynchronously (non-blocking)
             setTimeout(() => startBrowserDetection(), 0);
         }
         return true;
     });
-    
-    const [shareableUrl, setShareableUrl] = useState(
-        loaderData.type === 'existing' ? loaderData.shareableUrl : ""
-    );
-    
+
+    const [shareableUrl, setShareableUrl] = useState(() => {
+        if (loaderData.type === 'existing') {
+            const baseUrl = loaderData.shareableUrl;
+            // If we're on client-side and URL doesn't have domain, add it
+            if (typeof window !== 'undefined' && baseUrl && !baseUrl.startsWith('http')) {
+                return `${window.location.origin}${baseUrl}`;
+            }
+            return baseUrl;
+        }
+        return "";
+    });
+
     const [copied, setCopied] = useState(false);
     const [isCollecting, setIsCollecting] = useState(
         loaderData.type === 'new' && !browserDetails
@@ -88,9 +97,9 @@ export default function Detect() {
     // Browser detection function (extracted from previous useEffect logic)
     const startBrowserDetection = useCallback(async () => {
         if (typeof window === 'undefined') return; // SSR guard
-        
+
         console.log('🔍 Starting comprehensive browser detection...');
-        
+
         try {
             const detector = BrowserDetector.getInstance();
             const details = await detector.collectAllDetails();
@@ -177,6 +186,33 @@ export default function Detect() {
                             }
                         </p>
                     </div>
+
+
+
+                    <div className="flex flex-col sm:flex-row gap-4 justify-center my-12">
+                        <button
+                            onClick={copyToClipboard}
+                            className="inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 text-primary-foreground h-9 rounded-md px-3 bg-gradient-to-br from-brand-900 to-brand-800 hover:from-brand-800 hover:to-brand-900 min-w-30 shadow-elegant hover:shadow-glow transition-all duration-300 text-white cursor-pointer"
+                        >
+                            <CopyIcon />
+                            {copied ? "Copied to Clipboard!" : "Copy Share Link"}
+                        </button>
+                        <button
+                            onClick={emailUs}
+                            className="inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 text-primary-foreground h-9 rounded-md px-3 bg-gradient-to-br from-brand-900 to-brand-800 hover:from-brand-800 hover:to-brand-900 min-w-30 shadow-elegant hover:shadow-glow transition-all duration-300 text-white cursor-pointer"
+                        >
+                            <MailIcon />
+                            Email to us
+                        </button>
+                        <button
+                            onClick={() => navigate('/')}
+                            className="px-6 bg-secondary text-secondary-foreground rounded-lg hover:bg-secondary/90 transition-colors cursor-pointer hover:underline inline-flex items-center justify-center gap-2"
+                        >
+                            <HomeIcon />
+                            Back to Home
+                        </button>
+                    </div>
+
 
                     <div className="space-y-8">
                         {/* Enhanced Browser Details Grid */}
@@ -311,6 +347,12 @@ export default function Detect() {
                                         <span className="text-sm text-muted-foreground">Online Status:</span>
                                         <p className="font-medium">{browserDetails.onlineStatus ? '🟢 Online' : '🔴 Offline'}</p>
                                     </div>
+                                    {browserDetails.ipAddress && (
+                                        <div>
+                                            <span className="text-sm text-muted-foreground">IP Address:</span>
+                                            <p className="font-medium">{browserDetails.ipAddress}</p>
+                                        </div>
+                                    )}
                                     {browserDetails.effectiveType && (
                                         <div>
                                             <span className="text-sm text-muted-foreground">Connection:</span>
@@ -399,53 +441,45 @@ export default function Detect() {
 
                         </div>
 
-                        {/* Action Buttons */}
-                        <div className="flex flex-col sm:flex-row gap-4 justify-center mt-12">
-                            <button
-                                onClick={copyToClipboard}
-                                className="inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 text-primary-foreground h-9 rounded-md px-3 bg-gradient-to-br from-brand-900 to-brand-800 hover:from-brand-800 hover:to-brand-900 min-w-30 shadow-elegant hover:shadow-glow transition-all duration-300 text-white cursor-pointer"
-                            >
-                                {copied ? "✅ Copied to Clipboard!" : "Copy Share Link"}
-                            </button>
-                            <button
-                                onClick={emailUs}
-                                className="inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 text-primary-foreground h-9 rounded-md px-3 bg-gradient-to-br from-brand-900 to-brand-800 hover:from-brand-800 hover:to-brand-900 min-w-30 shadow-elegant hover:shadow-glow transition-all duration-300 text-white cursor-pointer"
-                            >
-                                Email to us
-                            </button>
-                            <button
-                                onClick={() => navigate('/')}
-                                className="px-6 bg-secondary text-secondary-foreground rounded-lg hover:bg-secondary/90 transition-colors cursor-pointer hover:underline"
-                            >
-                                Back to Home
-                            </button>
-                        </div>
 
-                        {/* Technical Details Expandable Section */}
-                        {browserDetails.canvasFingerprint && (
-                            <details className="bg-card border border-border rounded-lg p-6">
-                                <summary className="text-lg font-semibold text-foreground cursor-pointer">🔬 Advanced Technical Details</summary>
-                                <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* Advanced Technical Details Cards */}
+
+                        {/* Advanced - Combined Performance & Location */}
+                        <div className="bg-card border border-border rounded-lg p-6">
+                            <h3 className="text-lg font-semibold text-foreground mb-4">⚡ Advanced</h3>
+                            <div className="space-y-4">
+                                {/* Performance Section */}
+                                <div className="space-y-3">
                                     <div>
-                                        <span className="text-sm text-muted-foreground">Performance Load Time:</span>
+                                        <span className="text-sm text-muted-foreground">Load Time:</span>
                                         <p className="font-medium">{browserDetails.loadTime.toFixed(2)} ms</p>
                                     </div>
                                     <div>
                                         <span className="text-sm text-muted-foreground">Plugins Count:</span>
                                         <p className="font-medium">{browserDetails.plugins.length}</p>
                                     </div>
-                                    {browserDetails.geolocation && (
-                                        <div className="md:col-span-2">
-                                            <span className="text-sm text-muted-foreground">Geolocation:</span>
-                                            <p className="font-medium text-sm">
-                                                {browserDetails.geolocation.latitude.toFixed(4)}, {browserDetails.geolocation.longitude.toFixed(4)}
-                                                (±{browserDetails.geolocation.accuracy}m)
-                                            </p>
-                                        </div>
-                                    )}
                                 </div>
-                            </details>
-                        )}
+
+                                {/* Location Section */}
+                                {browserDetails.geolocation && (
+                                    <div className="space-y-3">
+                                        {browserDetails.geolocation.locationName && browserDetails.geolocation.locationName !== 'Unknown Location' ? (
+                                            <div>
+                                                <span className="text-sm text-muted-foreground">Location:</span>
+                                                <p className="font-medium">{browserDetails.geolocation.locationName}</p>
+                                            </div>
+                                        ) : (
+                                            <div>
+                                                <span className="text-sm text-muted-foreground">Coordinates:</span>
+                                                <p className="font-medium text-sm">
+                                                    {browserDetails.geolocation.latitude.toFixed(4)}, {browserDetails.geolocation.longitude.toFixed(4)}
+                                                </p>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
                     </div>
                 </div>
             </main>
