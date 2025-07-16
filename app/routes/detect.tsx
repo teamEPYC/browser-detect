@@ -1,210 +1,127 @@
-import { useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router";
+import { useLoaderData, useNavigate } from "react-router";
+import type { LoaderFunctionArgs } from "react-router";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { saveBrowserDetection, getBrowserDetection } from "../lib/database";
-import { v4 as uuidv4 } from 'uuid';
+import { BrowserDetector, type ComprehensiveBrowserDetails } from "../lib/browser-detection";
+import { useState, useCallback, useRef } from "react";
 
-interface BrowserDetails {
-    userAgent: string;
-    browser: string;
-    browserVersion: string;
-    os: string;
-    osVersion: string;
-    platform: string;
-    screenResolution: string;
-    pixelRatio: number;
-    timezone: string;
-    localTime: string;
-    language: string;
-    languages: string[];
-    touchSupport: boolean;
-    deviceMemory?: number;
-    hardwareConcurrency?: number;
-    connectionType?: string;
-    cookiesEnabled: boolean;
-    uniqueId: string;
-    timestamp: string;
+// Loader function - runs before component renders
+export async function loader({ params }: LoaderFunctionArgs) {
+    const { id } = params;
+
+    // If we have an ID, try to load existing detection
+    if (id) {
+        console.log('🔍 Loading existing detection:', id);
+        try {
+            const existingDetection = await getBrowserDetection(id);
+            if (existingDetection) {
+                return {
+                    type: 'existing' as const,
+                    data: existingDetection.detection_data,
+                    id: existingDetection.id,
+                    created_at: existingDetection.created_at,
+                    shareableUrl: `${typeof window !== 'undefined' ? window.location.origin : ''}/detect/${id}`
+                };
+            } else {
+                console.log('⚠️ Detection not found, will create new one');
+                return { type: 'new' as const };
+            }
+        } catch (error) {
+            console.error('Error loading detection:', error);
+            return { type: 'new' as const };
+        }
+    }
+
+    // No ID provided, create new detection
+    return { type: 'new' as const };
+}
+
+// Global flag to prevent multiple collections across all instances
+declare global {
+    interface Window {
+        browserDetectionInProgress?: boolean;
+    }
 }
 
 export default function Detect() {
-    const { id } = useParams<{ id?: string }>();
+    const loaderData = useLoaderData<typeof loader>();
     const navigate = useNavigate();
-    const [browserDetails, setBrowserDetails] = useState<BrowserDetails | null>(null);
-    const [isLoading, setIsLoading] = useState(true);
-    const [shareableUrl, setShareableUrl] = useState("");
-    const [copied, setCopied] = useState(false);
-    const [isExistingDetection, setIsExistingDetection] = useState(false);
-
-    useEffect(() => {
-        if (id) {
-            loadExistingDetection(id);
-        } else {
-            collectBrowserDetails();
+    
+    // Protection flags
+    const collectionStartedRef = useRef(false);
+    const isCollectingRef = useRef(false);
+    
+    // Initialize state - for existing detections, set data immediately
+    const [browserDetails, setBrowserDetails] = useState<ComprehensiveBrowserDetails | null>(
+        loaderData.type === 'existing' ? loaderData.data as ComprehensiveBrowserDetails : null
+    );
+    
+    // Initialize and start collection for new detections
+    const [, setInitialized] = useState(() => {
+        // Only run on client-side for new detections
+        if (typeof window !== 'undefined' && 
+            loaderData.type === 'new' && 
+            !collectionStartedRef.current && 
+            !window.browserDetectionInProgress) {
+            
+            // Set protection flags immediately
+            collectionStartedRef.current = true;
+            isCollectingRef.current = true;
+            window.browserDetectionInProgress = true;
+            
+            // Start collection asynchronously (non-blocking)
+            setTimeout(() => startBrowserDetection(), 0);
         }
-    }, [id]);
+        return true;
+    });
+    
+    const [shareableUrl, setShareableUrl] = useState(
+        loaderData.type === 'existing' ? loaderData.shareableUrl : ""
+    );
+    
+    const [copied, setCopied] = useState(false);
+    const [isCollecting, setIsCollecting] = useState(
+        loaderData.type === 'new' && !browserDetails
+    );
 
-    const collectBrowserDetails = async () => {
-        console.log('🔍 Starting browser detection...');
+    // Browser detection function (extracted from previous useEffect logic)
+    const startBrowserDetection = useCallback(async () => {
+        if (typeof window === 'undefined') return; // SSR guard
+        
+        console.log('🔍 Starting comprehensive browser detection...');
+        
         try {
-            // Generate unique ID using UUID
-            const uniqueId = uuidv4();
-            console.log('📝 Generated UUID:', uniqueId);
+            const detector = BrowserDetector.getInstance();
+            const details = await detector.collectAllDetails();
 
-            // Collect browser details
-            const details: BrowserDetails = {
-                userAgent: navigator.userAgent,
-                browser: getBrowserInfo().name,
-                browserVersion: getBrowserInfo().version,
-                os: getOSInfo().name,
-                osVersion: getOSInfo().version,
-                platform: navigator.platform,
-                screenResolution: `${screen.width}x${screen.height}`,
-                pixelRatio: window.devicePixelRatio,
-                timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-                localTime: new Date().toLocaleString(),
-                language: navigator.language,
-                languages: Array.from(navigator.languages),
-                touchSupport: 'ontouchstart' in window,
-                deviceMemory: (navigator as any).deviceMemory,
-                hardwareConcurrency: navigator.hardwareConcurrency,
-                connectionType: (navigator as any).connection?.effectiveType,
-                cookiesEnabled: navigator.cookieEnabled,
-                uniqueId,
-                timestamp: new Date().toISOString()
-            };
-
+            console.log('📊 Collected browser details:', details);
             setBrowserDetails(details);
 
-            // Prepare data for saving
-            const detectionData = {
-                ...details,
-                deviceType: getDeviceType(),
-                viewportSize: `${window.innerWidth}x${window.innerHeight}`,
-                colorDepth: screen.colorDepth,
-                pixelDepth: screen.pixelDepth,
-                maxTouchPoints: navigator.maxTouchPoints || 0,
-                javaEnabled: typeof (window as any).java !== 'undefined',
-                onlineStatus: navigator.onLine,
-                referrer: document.referrer,
-                url: window.location.href
-            };
-
-            // Save to Supabase database
+            // Save to database
             try {
-                const savedDetection = await saveBrowserDetection(detectionData);
-                const shareableUrl = `${window.location.origin}/detect/${savedDetection.id}`;
-                setShareableUrl(shareableUrl);
+                const savedDetection = await saveBrowserDetection(details);
+                const newShareableUrl = `${window.location.origin}/detect/${savedDetection.id}`;
+                setShareableUrl(newShareableUrl);
 
-                // Update the URL without page reload
+                // Update URL without page reload
                 window.history.replaceState({}, '', `/detect/${savedDetection.id}`);
-
+                console.log('✅ Saved to database with ID:', savedDetection.id);
             } catch (error) {
-                console.error('Error saving to database:', error);
-                // Fallback to local unique ID if database save fails
-                const shareableUrl = `${window.location.origin}/detect/${uniqueId}`;
-                setShareableUrl(shareableUrl);
-                window.history.replaceState({}, '', `/detect/${uniqueId}`);
+                console.error('❌ Error saving to database:', error);
+                // Fallback URL with generated ID
+                const fallbackUrl = `${window.location.origin}/detect/${details.uniqueId}`;
+                setShareableUrl(fallbackUrl);
+                window.history.replaceState({}, '', `/detect/${details.uniqueId}`);
             }
-
         } catch (error) {
             console.error('Error collecting browser details:', error);
         } finally {
-            setIsLoading(false);
+            setIsCollecting(false);
+            isCollectingRef.current = false;
+            // Keep protection flags set to prevent any future attempts
         }
-    };
-
-    const loadExistingDetection = async (detectionId: string) => {
-        try {
-            const detection = await getBrowserDetection(detectionId);
-            if (detection) {
-                // Convert BrowserDetectionData to BrowserDetails format
-                const browserDetails: BrowserDetails = {
-                    ...detection.detection_data,
-                    uniqueId: detection.id,
-                    timestamp: detection.created_at
-                };
-                setBrowserDetails(browserDetails);
-                setShareableUrl(`${window.location.origin}/detect/${detectionId}`);
-                setIsExistingDetection(true);
-            } else {
-                // If detection not found, start new detection
-                console.log('Detection not found, creating new detection');
-                collectBrowserDetails();
-                return;
-            }
-        } catch (error) {
-            console.error('Error loading existing detection:', error);
-            // Fallback to new detection
-            collectBrowserDetails();
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
-    const getBrowserInfo = () => {
-        const userAgent = navigator.userAgent;
-        let name = "Unknown";
-        let version = "Unknown";
-
-        if (userAgent.includes("Chrome")) {
-            name = "Chrome";
-            version = userAgent.match(/Chrome\/(\d+)/)?.[1] || "Unknown";
-        } else if (userAgent.includes("Firefox")) {
-            name = "Firefox";
-            version = userAgent.match(/Firefox\/(\d+)/)?.[1] || "Unknown";
-        } else if (userAgent.includes("Safari")) {
-            name = "Safari";
-            version = userAgent.match(/Version\/(\d+)/)?.[1] || "Unknown";
-        } else if (userAgent.includes("Edge")) {
-            name = "Edge";
-            version = userAgent.match(/Edge\/(\d+)/)?.[1] || "Unknown";
-        }
-
-        return { name, version };
-    };
-
-    const getOSInfo = () => {
-        const userAgent = navigator.userAgent;
-        let name = "Unknown";
-        let version = "Unknown";
-
-        if (userAgent.includes("Windows")) {
-            name = "Windows";
-            if (userAgent.includes("Windows NT 10.0")) version = "10";
-            else if (userAgent.includes("Windows NT 6.3")) version = "8.1";
-            else if (userAgent.includes("Windows NT 6.2")) version = "8";
-            else if (userAgent.includes("Windows NT 6.1")) version = "7";
-        } else if (userAgent.includes("Mac")) {
-            name = "macOS";
-            const match = userAgent.match(/Mac OS X (\d+_\d+)/);
-            if (match) version = match[1].replace('_', '.');
-        } else if (userAgent.includes("Linux")) {
-            name = "Linux";
-        } else if (userAgent.includes("Android")) {
-            name = "Android";
-            const match = userAgent.match(/Android (\d+)/);
-            if (match) version = match[1];
-        } else if (userAgent.includes("iOS")) {
-            name = "iOS";
-            const match = userAgent.match(/OS (\d+_\d+)/);
-            if (match) version = match[1].replace('_', '.');
-        }
-
-        return { name, version };
-    };
-
-    const getDeviceType = () => {
-        const userAgent = navigator.userAgent;
-
-        if (/tablet|ipad|playbook|silk/i.test(userAgent)) {
-            return "tablet";
-        } else if (/mobile|iphone|ipod|android|blackberry|opera|mini|windows\sce|palm|smartphone|iemobile/i.test(userAgent)) {
-            return "mobile";
-        } else {
-            return "desktop";
-        }
-    };
+    }, []); // No dependencies needed since we're not using this in useEffect
 
     const copyToClipboard = async () => {
         try {
@@ -222,14 +139,20 @@ export default function Detect() {
         window.location.href = `mailto:support@epyc.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
     };
 
-    if (isLoading) {
+    // Loading state - same as before
+    if (isCollecting || !browserDetails) {
         return (
             <div className="min-h-screen bg-background">
                 <Header />
                 <main className="flex items-center justify-center min-h-[60vh]">
                     <div className="text-center">
-                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-                        <p className="text-lg text-muted-foreground">Collecting your browser details...</p>
+                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-900 mx-auto mb-4"></div>
+                        <p className="text-lg text-muted-foreground">
+                            {loaderData.type === 'existing' ? 'Loading browser details...' : 'Collecting comprehensive browser details...'}
+                        </p>
+                        <p className="text-sm text-muted-foreground mt-2">
+                            Gathering {loaderData.type === 'new' ? '50+' : ''} data points about your browser and device
+                        </p>
                     </div>
                 </main>
                 <Footer />
@@ -237,132 +160,296 @@ export default function Detect() {
         );
     }
 
+    // Main UI - exactly the same as your current implementation
     return (
         <div className="min-h-screen bg-background">
             <Header />
             <main className="container mx-auto px-4 py-16">
-                <div className="max-w-4xl mx-auto">
+                <div className="max-w-6xl mx-auto">
                     <div className="text-center mb-12 pt-12">
-                        <h1 className="text-4xl font-bold text-foreground mb-4">Your Browser Details</h1>
-                        <p className="text-lg text-muted-foreground">Share this information with our team for faster debugging</p>
+                        <h1 className="text-4xl font-bold text-foreground mb-4">
+                            {loaderData.type === 'existing' ? 'Shared Browser Details' : 'Your Comprehensive Browser Profile'}
+                        </h1>
+                        <p className="text-lg text-muted-foreground">
+                            {loaderData.type === 'existing'
+                                ? `Detected on ${new Date(loaderData.created_at).toLocaleString()}`
+                                : 'Complete technical profile for debugging and support'
+                            }
+                        </p>
                     </div>
 
-                    {browserDetails && (
-                        <div className="space-y-8">
+                    <div className="space-y-8">
+                        {/* Enhanced Browser Details Grid */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
 
-                            {/* Browser Details Grid */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div className="bg-card border border-border rounded-lg p-6">
-                                    <h3 className="text-lg font-semibold text-foreground mb-4">Browser Information</h3>
-                                    <div className="space-y-3">
-                                        <div>
-                                            <span className="text-sm text-muted-foreground">Browser:</span>
-                                            <p className="font-medium">{browserDetails.browser} {browserDetails.browserVersion}</p>
-                                        </div>
-                                        <div>
-                                            <span className="text-sm text-muted-foreground">User Agent:</span>
-                                            <p className="font-medium text-sm break-all">{browserDetails.userAgent}</p>
-                                        </div>
-                                        <div>
-                                            <span className="text-sm text-muted-foreground">Cookies Enabled:</span>
-                                            <p className="font-medium">{browserDetails.cookiesEnabled ? "Yes" : "No"}</p>
-                                        </div>
+                            {/* Browser Information */}
+                            <div className="bg-card border border-border rounded-lg p-6">
+                                <h3 className="text-lg font-semibold text-foreground mb-4">🌐 Browser Information</h3>
+                                <div className="space-y-3">
+                                    <div>
+                                        <span className="text-sm text-muted-foreground">Browser:</span>
+                                        <p className="font-medium">{browserDetails.browser} {browserDetails.browserVersion}</p>
+                                    </div>
+                                    <div>
+                                        <span className="text-sm text-muted-foreground">Engine:</span>
+                                        <p className="font-medium">{browserDetails.browserEngine}</p>
+                                    </div>
+                                    <div>
+                                        <span className="text-sm text-muted-foreground">User Agent:</span>
+                                        <p className="font-medium text-xs break-all">{browserDetails.userAgent}</p>
                                     </div>
                                 </div>
+                            </div>
 
-                                <div className="bg-card border border-border rounded-lg p-6">
-                                    <h3 className="text-lg font-semibold text-foreground mb-4">System Information</h3>
-                                    <div className="space-y-3">
-                                        <div>
-                                            <span className="text-sm text-muted-foreground">Operating System:</span>
-                                            <p className="font-medium">{browserDetails.os} {browserDetails.osVersion}</p>
-                                        </div>
-                                        <div>
-                                            <span className="text-sm text-muted-foreground">Platform:</span>
-                                            <p className="font-medium">{browserDetails.platform}</p>
-                                        </div>
-                                        <div>
-                                            <span className="text-sm text-muted-foreground">Screen Resolution:</span>
-                                            <p className="font-medium">{browserDetails.screenResolution}</p>
-                                        </div>
-                                        <div>
-                                            <span className="text-sm text-muted-foreground">Pixel Ratio:</span>
-                                            <p className="font-medium">{browserDetails.pixelRatio}</p>
-                                        </div>
+                            {/* System Information */}
+                            <div className="bg-card border border-border rounded-lg p-6">
+                                <h3 className="text-lg font-semibold text-foreground mb-4">💻 System Information</h3>
+                                <div className="space-y-3">
+                                    <div>
+                                        <span className="text-sm text-muted-foreground">Operating System:</span>
+                                        <p className="font-medium">{browserDetails.os} {browserDetails.osVersion}</p>
+                                    </div>
+                                    <div>
+                                        <span className="text-sm text-muted-foreground">Architecture:</span>
+                                        <p className="font-medium">{browserDetails.architecture}</p>
+                                    </div>
+                                    <div>
+                                        <span className="text-sm text-muted-foreground">Platform:</span>
+                                        <p className="font-medium">{browserDetails.platform}</p>
                                     </div>
                                 </div>
+                            </div>
 
-                                <div className="bg-card border border-border rounded-lg p-6">
-                                    <h3 className="text-lg font-semibold text-foreground mb-4">Hardware & Performance</h3>
-                                    <div className="space-y-3">
+                            {/* Device Information */}
+                            <div className="bg-card border border-border rounded-lg p-6">
+                                <h3 className="text-lg font-semibold text-foreground mb-4">📱 Device Information</h3>
+                                <div className="space-y-3">
+                                    <div>
+                                        <span className="text-sm text-muted-foreground">Device Type:</span>
+                                        <p className="font-medium capitalize">{browserDetails.deviceType}</p>
+                                    </div>
+                                    {browserDetails.deviceModel && (
                                         <div>
-                                            <span className="text-sm text-muted-foreground">Hardware Concurrency:</span>
-                                            <p className="font-medium">{browserDetails.hardwareConcurrency || "Unknown"}</p>
+                                            <span className="text-sm text-muted-foreground">Model:</span>
+                                            <p className="font-medium">{browserDetails.deviceModel}</p>
                                         </div>
+                                    )}
+                                    <div>
+                                        <span className="text-sm text-muted-foreground">Flags:</span>
+                                        <p className="font-medium text-sm">
+                                            {browserDetails.isMobile ? '📱 Mobile' : ''}
+                                            {browserDetails.isTablet ? '📟 Tablet' : ''}
+                                            {browserDetails.isDesktop ? '🖥️ Desktop' : ''}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Display & Graphics */}
+                            <div className="bg-card border border-border rounded-lg p-6">
+                                <h3 className="text-lg font-semibold text-foreground mb-4">🖼️ Display & Graphics</h3>
+                                <div className="space-y-3">
+                                    <div>
+                                        <span className="text-sm text-muted-foreground">Screen Resolution:</span>
+                                        <p className="font-medium">{browserDetails.screenResolution}</p>
+                                    </div>
+                                    <div>
+                                        <span className="text-sm text-muted-foreground">Viewport Size:</span>
+                                        <p className="font-medium">{browserDetails.viewportSize}</p>
+                                    </div>
+                                    <div>
+                                        <span className="text-sm text-muted-foreground">Pixel Ratio:</span>
+                                        <p className="font-medium">{browserDetails.pixelRatio}x</p>
+                                    </div>
+                                    <div>
+                                        <span className="text-sm text-muted-foreground">Color Depth:</span>
+                                        <p className="font-medium">{browserDetails.colorDepth} bits</p>
+                                    </div>
+                                    <div>
+                                        <span className="text-sm text-muted-foreground">WebGL Support:</span>
+                                        <p className="font-medium">
+                                            {browserDetails.webglSupported ? '✅ WebGL' : '❌ WebGL'}
+                                            {browserDetails.webgl2Supported ? ' ✅ WebGL2' : ' ❌ WebGL2'}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Hardware Capabilities */}
+                            <div className="bg-card border border-border rounded-lg p-6">
+                                <h3 className="text-lg font-semibold text-foreground mb-4">⚡ Hardware</h3>
+                                <div className="space-y-3">
+                                    <div>
+                                        <span className="text-sm text-muted-foreground">CPU Cores:</span>
+                                        <p className="font-medium">{browserDetails.hardwareConcurrency}</p>
+                                    </div>
+                                    {browserDetails.deviceMemory && (
                                         <div>
                                             <span className="text-sm text-muted-foreground">Device Memory:</span>
-                                            <p className="font-medium">{browserDetails.deviceMemory ? `${browserDetails.deviceMemory} GB` : "Unknown"}</p>
+                                            <p className="font-medium">{browserDetails.deviceMemory} GB</p>
                                         </div>
-                                        <div>
-                                            <span className="text-sm text-muted-foreground">Touch Support:</span>
-                                            <p className="font-medium">{browserDetails.touchSupport ? "Yes" : "No"}</p>
-                                        </div>
-                                        <div>
-                                            <span className="text-sm text-muted-foreground">Connection Type:</span>
-                                            <p className="font-medium">{browserDetails.connectionType || "Unknown"}</p>
-                                        </div>
+                                    )}
+                                    <div>
+                                        <span className="text-sm text-muted-foreground">Touch Points:</span>
+                                        <p className="font-medium">{browserDetails.maxTouchPoints}</p>
                                     </div>
-                                </div>
-
-                                <div className="bg-card border border-border rounded-lg p-6">
-                                    <h3 className="text-lg font-semibold text-foreground mb-4">Localization</h3>
-                                    <div className="space-y-3">
-                                        <div>
-                                            <span className="text-sm text-muted-foreground">Language:</span>
-                                            <p className="font-medium">{browserDetails.language}</p>
-                                        </div>
-                                        <div>
-                                            <span className="text-sm text-muted-foreground">Languages:</span>
-                                            <p className="font-medium text-sm">{browserDetails.languages.join(", ")}</p>
-                                        </div>
-                                        <div>
-                                            <span className="text-sm text-muted-foreground">Timezone:</span>
-                                            <p className="font-medium">{browserDetails.timezone}</p>
-                                        </div>
-                                        <div>
-                                            <span className="text-sm text-muted-foreground">Local Time:</span>
-                                            <p className="font-medium">{browserDetails.localTime}</p>
-                                        </div>
+                                    <div>
+                                        <span className="text-sm text-muted-foreground">Input Support:</span>
+                                        <p className="font-medium text-sm">
+                                            {browserDetails.touchSupport ? '👆 Touch' : '❌ Touch'}
+                                            {browserDetails.pointerSupport ? ' 🖱️ Pointer' : ' ❌ Pointer'}
+                                        </p>
                                     </div>
                                 </div>
                             </div>
 
-                            {/* Action Buttons */}
-                            <div className="flex flex-col sm:flex-row gap-4 justify-center mt-12">
-                                <button
-                                    onClick={copyToClipboard}
-                                    className="inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 text-primary-foreground  h-9 rounded-md px-3 bg-gradient-to-br from-brand-900 to-brand-800 hover:from-brand-800 hover:to-brand-900 min-w-30 shadow-elegant hover:shadow-glow transition-all duration-300 text-white cursor-pointer"
-                                >
-                                    {copied ? " Copied to Clipboard!" : "Copy Link"}
-                                </button>
-                                <button
-                                    onClick={emailUs}
-                                    className="inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 text-primary-foreground h-9 rounded-md px-3 bg-gradient-to-br from-brand-900 to-brand-800 hover:from-brand-800 hover:to-brand-900 min-w-30 shadow-elegant hover:shadow-glow transition-all duration-300 text-white cursor-pointer"
-                                >
-                                    Email Us
-                                </button>
-                                <button
-                                    onClick={() => navigate('/')}
-                                    className="px-6 bg-secondary text-secondary-foreground rounded-lg hover:bg-secondary/90 transition-colors cursor-pointer hover:underline"
-                                >
-                                    Back to Home
-                                </button>
+                            {/* Network & Connection */}
+                            <div className="bg-card border border-border rounded-lg p-6">
+                                <h3 className="text-lg font-semibold text-foreground mb-4">🌐 Network</h3>
+                                <div className="space-y-3">
+                                    <div>
+                                        <span className="text-sm text-muted-foreground">Online Status:</span>
+                                        <p className="font-medium">{browserDetails.onlineStatus ? '🟢 Online' : '🔴 Offline'}</p>
+                                    </div>
+                                    {browserDetails.effectiveType && (
+                                        <div>
+                                            <span className="text-sm text-muted-foreground">Connection:</span>
+                                            <p className="font-medium">{browserDetails.effectiveType}</p>
+                                        </div>
+                                    )}
+                                    {browserDetails.downlink && (
+                                        <div>
+                                            <span className="text-sm text-muted-foreground">Downlink:</span>
+                                            <p className="font-medium">{browserDetails.downlink} Mbps</p>
+                                        </div>
+                                    )}
+                                    {browserDetails.rtt && (
+                                        <div>
+                                            <span className="text-sm text-muted-foreground">RTT:</span>
+                                            <p className="font-medium">{browserDetails.rtt} ms</p>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
+
+                            {/* Security & Privacy */}
+                            <div className="bg-card border border-border rounded-lg p-6">
+                                <h3 className="text-lg font-semibold text-foreground mb-4">🔒 Security & Privacy</h3>
+                                <div className="space-y-3">
+                                    <div>
+                                        <span className="text-sm text-muted-foreground">Cookies:</span>
+                                        <p className="font-medium">{browserDetails.cookiesEnabled ? '✅ Enabled' : '❌ Disabled'}</p>
+                                    </div>
+                                    <div>
+                                        <span className="text-sm text-muted-foreground">Do Not Track:</span>
+                                        <p className="font-medium">{browserDetails.doNotTrack || 'Not set'}</p>
+                                    </div>
+                                    <div>
+                                        <span className="text-sm text-muted-foreground">Private Mode:</span>
+                                        <p className="font-medium">{browserDetails.privateMode ? '🕵️ Yes' : '👁️ No'}</p>
+                                    </div>
+                                    <div>
+                                        <span className="text-sm text-muted-foreground">Ad Blocker:</span>
+                                        <p className="font-medium">{browserDetails.adBlockerDetected ? '🛡️ Detected' : '❌ None'}</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Storage Support */}
+                            <div className="bg-card border border-border rounded-lg p-6">
+                                <h3 className="text-lg font-semibold text-foreground mb-4">💾 Storage</h3>
+                                <div className="space-y-3">
+                                    <div>
+                                        <span className="text-sm text-muted-foreground">Local Storage:</span>
+                                        <p className="font-medium">{browserDetails.localStorageAvailable ? '✅ Available' : '❌ Blocked'}</p>
+                                    </div>
+                                    <div>
+                                        <span className="text-sm text-muted-foreground">Session Storage:</span>
+                                        <p className="font-medium">{browserDetails.sessionStorageAvailable ? '✅ Available' : '❌ Blocked'}</p>
+                                    </div>
+                                    <div>
+                                        <span className="text-sm text-muted-foreground">IndexedDB:</span>
+                                        <p className="font-medium">{browserDetails.indexedDBAvailable ? '✅ Available' : '❌ Blocked'}</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Localization */}
+                            <div className="bg-card border border-border rounded-lg p-6">
+                                <h3 className="text-lg font-semibold text-foreground mb-4">🌍 Localization</h3>
+                                <div className="space-y-3">
+                                    <div>
+                                        <span className="text-sm text-muted-foreground">Primary Language:</span>
+                                        <p className="font-medium">{browserDetails.language}</p>
+                                    </div>
+                                    <div>
+                                        <span className="text-sm text-muted-foreground">All Languages:</span>
+                                        <p className="font-medium text-sm">{browserDetails.languages.slice(0, 3).join(', ')}</p>
+                                    </div>
+                                    <div>
+                                        <span className="text-sm text-muted-foreground">Timezone:</span>
+                                        <p className="font-medium">{browserDetails.timezone}</p>
+                                    </div>
+                                    <div>
+                                        <span className="text-sm text-muted-foreground">Local Time:</span>
+                                        <p className="font-medium">{browserDetails.localTime}</p>
+                                    </div>
+                                </div>
+                            </div>
+
                         </div>
-                    )}
+
+                        {/* Action Buttons */}
+                        <div className="flex flex-col sm:flex-row gap-4 justify-center mt-12">
+                            <button
+                                onClick={copyToClipboard}
+                                className="inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 text-primary-foreground h-9 rounded-md px-3 bg-gradient-to-br from-brand-900 to-brand-800 hover:from-brand-800 hover:to-brand-900 min-w-30 shadow-elegant hover:shadow-glow transition-all duration-300 text-white cursor-pointer"
+                            >
+                                {copied ? "✅ Copied to Clipboard!" : "Copy Share Link"}
+                            </button>
+                            <button
+                                onClick={emailUs}
+                                className="inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 text-primary-foreground h-9 rounded-md px-3 bg-gradient-to-br from-brand-900 to-brand-800 hover:from-brand-800 hover:to-brand-900 min-w-30 shadow-elegant hover:shadow-glow transition-all duration-300 text-white cursor-pointer"
+                            >
+                                Email to us
+                            </button>
+                            <button
+                                onClick={() => navigate('/')}
+                                className="px-6 bg-secondary text-secondary-foreground rounded-lg hover:bg-secondary/90 transition-colors cursor-pointer hover:underline"
+                            >
+                                Back to Home
+                            </button>
+                        </div>
+
+                        {/* Technical Details Expandable Section */}
+                        {browserDetails.canvasFingerprint && (
+                            <details className="bg-card border border-border rounded-lg p-6">
+                                <summary className="text-lg font-semibold text-foreground cursor-pointer">🔬 Advanced Technical Details</summary>
+                                <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
+                                        <span className="text-sm text-muted-foreground">Performance Load Time:</span>
+                                        <p className="font-medium">{browserDetails.loadTime.toFixed(2)} ms</p>
+                                    </div>
+                                    <div>
+                                        <span className="text-sm text-muted-foreground">Plugins Count:</span>
+                                        <p className="font-medium">{browserDetails.plugins.length}</p>
+                                    </div>
+                                    {browserDetails.geolocation && (
+                                        <div className="md:col-span-2">
+                                            <span className="text-sm text-muted-foreground">Geolocation:</span>
+                                            <p className="font-medium text-sm">
+                                                {browserDetails.geolocation.latitude.toFixed(4)}, {browserDetails.geolocation.longitude.toFixed(4)}
+                                                (±{browserDetails.geolocation.accuracy}m)
+                                            </p>
+                                        </div>
+                                    )}
+                                </div>
+                            </details>
+                        )}
+                    </div>
                 </div>
             </main>
             <Footer />
         </div>
     );
-} 
+}

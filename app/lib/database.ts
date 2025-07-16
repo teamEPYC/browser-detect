@@ -1,7 +1,8 @@
 import { supabase, type BrowserDetection, type BrowserDetectionData } from './supabase'
+import { type ComprehensiveBrowserDetails } from './browser-detection'
 
 // Save browser detection data to Supabase
-export async function saveBrowserDetection(data: BrowserDetectionData) {
+export async function saveBrowserDetection(data: ComprehensiveBrowserDetails) {
   if (!supabase) {
     console.warn('⚠️ Supabase not available, skipping database save')
     // Return a mock response for offline mode
@@ -10,7 +11,7 @@ export async function saveBrowserDetection(data: BrowserDetectionData) {
       created_at: new Date().toISOString(),
       detection_data: data,
       user_agent: data.userAgent,
-      ip_address: undefined
+      ip_address: data.ipAddress
     } as BrowserDetection
   }
 
@@ -19,7 +20,8 @@ export async function saveBrowserDetection(data: BrowserDetectionData) {
       .from('browser_detections')
       .insert([{
         detection_data: data,
-        user_agent: data.userAgent
+        user_agent: data.userAgent,
+        ip_address: data.ipAddress
       }])
       .select()
       .single()
