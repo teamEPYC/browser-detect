@@ -7,6 +7,32 @@ import { BrowserDetector, type ComprehensiveBrowserDetails } from "../lib/browse
 import { CopyIcon, MailIcon, HomeIcon } from "../components/icons";
 import { useState, useCallback, useRef } from "react";
 
+// --- Helper Components for the new table layout ---
+
+// Table Section Header Component
+const TableSectionHeader = ({ title, icon }: { title: string; icon: string; }) => (
+    <tr className="bg-muted/40 border-t-2 border-gray-200 border-muted">
+        <th colSpan={2} className="p-4 text-left text-xl font-bold text-foreground">
+            <div className="flex items-center gap-4">
+                <span className="text-2xl">{icon}</span>
+                <span>{title}</span>
+            </div>
+        </th>
+    </tr>
+);
+
+// Table Row Component
+const TableRow = ({ label, value }: { label: string; value: React.ReactNode; }) => {
+    if (value === null || value === undefined || value === '') return null;
+    return (
+        <tr className="border-b border-border border-gray-200 last:border-b-0 odd:bg-white even:bg-muted/40 hover:bg-brand-100/40 transition-colors">
+            <td className="p-4 font-semibold text-foreground w-1/3">{label}</td>
+            <td className="p-4 text-muted-foreground break-all">{value}</td>
+        </tr>
+    );
+};
+
+
 // Loader function - runs before component renders
 export async function loader({ params }: LoaderFunctionArgs) {
     const { id } = params;
@@ -169,15 +195,15 @@ export default function Detect() {
         );
     }
 
-    // Main UI - exactly the same as your current implementation
+    // Main UI - with new "Table Report" layout
     return (
         <div className="min-h-screen bg-background">
             <Header />
             <main className="container mx-auto px-4 py-16">
-                <div className="max-w-6xl mx-auto">
+                <div className="max-w-4xl mx-auto">
                     <div className="text-center mb-12 pt-12">
                         <h1 className="text-4xl font-bold text-foreground mb-4">
-                            {loaderData.type === 'existing' ? 'Shared Browser Details' : 'Your Comprehensive Browser Profile'}
+                            {loaderData.type === 'existing' ? 'Shared Browser Details' : 'Your Browser Details'}
                         </h1>
                         <p className="text-lg text-muted-foreground">
                             {loaderData.type === 'existing'
@@ -186,8 +212,6 @@ export default function Detect() {
                             }
                         </p>
                     </div>
-
-
 
                     <div className="flex flex-col sm:flex-row gap-4 justify-center my-12">
                         <button
@@ -213,273 +237,69 @@ export default function Detect() {
                         </button>
                     </div>
 
+                    <div className="border border-gray-200 border-muted rounded-lg overflow-hidden">
+                        <table className="w-full text-sm">
+                            <tbody>
+                                <TableSectionHeader title="Browser Information" icon="🌐" />
+                                <TableRow label="Browser" value={`${browserDetails.browser} ${browserDetails.browserVersion}`} />
+                                <TableRow label="Engine" value={browserDetails.browserEngine} />
+                                <TableRow label="User Agent" value={browserDetails.userAgent} />
 
-                    <div className="space-y-8">
-                        {/* Enhanced Browser Details Grid */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                <TableSectionHeader title="System & Device" icon="💻" />
+                                <TableRow label="Operating System" value={`${browserDetails.os} ${browserDetails.osVersion}`} />
+                                <TableRow label="Architecture" value={browserDetails.architecture} />
+                                <TableRow label="Device Type" value={browserDetails.deviceType} />
+                                <TableRow label="Model" value={browserDetails.deviceModel} />
 
-                            {/* Browser Information */}
-                            <div className="bg-card border border-border rounded-lg p-6">
-                                <h3 className="text-lg font-semibold text-foreground mb-4">🌐 Browser Information</h3>
-                                <div className="space-y-3">
-                                    <div>
-                                        <span className="text-sm text-muted-foreground">Browser:</span>
-                                        <p className="font-medium">{browserDetails.browser} {browserDetails.browserVersion}</p>
-                                    </div>
-                                    <div>
-                                        <span className="text-sm text-muted-foreground">Engine:</span>
-                                        <p className="font-medium">{browserDetails.browserEngine}</p>
-                                    </div>
-                                    <div>
-                                        <span className="text-sm text-muted-foreground">User Agent:</span>
-                                        <p className="font-medium text-xs break-all">{browserDetails.userAgent}</p>
-                                    </div>
-                                </div>
-                            </div>
+                                <TableSectionHeader title="Display & Graphics" icon="🖼️" />
+                                <TableRow label="Screen Resolution" value={browserDetails.screenResolution} />
+                                <TableRow label="Viewport Size" value={browserDetails.viewportSize} />
+                                <TableRow label="Pixel Ratio" value={`${browserDetails.pixelRatio}x`} />
+                                <TableRow label="Color Depth" value={`${browserDetails.colorDepth} bits`} />
+                                <TableRow label="WebGL Support" value={
+                                    <>
+                                        {browserDetails.webglSupported ? '✅ WebGL' : '❌ WebGL'}
+                                        {browserDetails.webgl2Supported ? ' ✅ WebGL2' : ' ❌ WebGL2'}
+                                    </>
+                                } />
+                                
+                                <TableSectionHeader title="Hardware & Network" icon="⚡" />
+                                <TableRow label="CPU Cores" value={browserDetails.hardwareConcurrency} />
+                                <TableRow label="Device Memory" value={browserDetails.deviceMemory ? `${browserDetails.deviceMemory} GB` : ''} />
+                                <TableRow label="Online Status" value={browserDetails.onlineStatus ? '🟢 Online' : '🔴 Offline'} />
+                                <TableRow label="IP Address" value={browserDetails.ipAddress} />
+                                <TableRow label="Connection" value={browserDetails.effectiveType} />
+                                <TableRow label="Downlink" value={browserDetails.downlink ? `${browserDetails.downlink} Mbps` : ''} />
+                                <TableRow label="RTT" value={browserDetails.rtt ? `${browserDetails.rtt} ms` : ''} />
 
-                            {/* System Information */}
-                            <div className="bg-card border border-border rounded-lg p-6">
-                                <h3 className="text-lg font-semibold text-foreground mb-4">💻 System Information</h3>
-                                <div className="space-y-3">
-                                    <div>
-                                        <span className="text-sm text-muted-foreground">Operating System:</span>
-                                        <p className="font-medium">{browserDetails.os} {browserDetails.osVersion}</p>
-                                    </div>
-                                    <div>
-                                        <span className="text-sm text-muted-foreground">Architecture:</span>
-                                        <p className="font-medium">{browserDetails.architecture}</p>
-                                    </div>
-                                    <div>
-                                        <span className="text-sm text-muted-foreground">Platform:</span>
-                                        <p className="font-medium">{browserDetails.platform}</p>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Device Information */}
-                            <div className="bg-card border border-border rounded-lg p-6">
-                                <h3 className="text-lg font-semibold text-foreground mb-4">📱 Device Information</h3>
-                                <div className="space-y-3">
-                                    <div>
-                                        <span className="text-sm text-muted-foreground">Device Type:</span>
-                                        <p className="font-medium capitalize">{browserDetails.deviceType}</p>
-                                    </div>
-                                    {browserDetails.deviceModel && (
-                                        <div>
-                                            <span className="text-sm text-muted-foreground">Model:</span>
-                                            <p className="font-medium">{browserDetails.deviceModel}</p>
-                                        </div>
-                                    )}
-                                    <div>
-                                        <span className="text-sm text-muted-foreground">Flags:</span>
-                                        <p className="font-medium text-sm">
-                                            {browserDetails.isMobile ? '📱 Mobile' : ''}
-                                            {browserDetails.isTablet ? '📟 Tablet' : ''}
-                                            {browserDetails.isDesktop ? '🖥️ Desktop' : ''}
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Display & Graphics */}
-                            <div className="bg-card border border-border rounded-lg p-6">
-                                <h3 className="text-lg font-semibold text-foreground mb-4">🖼️ Display & Graphics</h3>
-                                <div className="space-y-3">
-                                    <div>
-                                        <span className="text-sm text-muted-foreground">Screen Resolution:</span>
-                                        <p className="font-medium">{browserDetails.screenResolution}</p>
-                                    </div>
-                                    <div>
-                                        <span className="text-sm text-muted-foreground">Viewport Size:</span>
-                                        <p className="font-medium">{browserDetails.viewportSize}</p>
-                                    </div>
-                                    <div>
-                                        <span className="text-sm text-muted-foreground">Pixel Ratio:</span>
-                                        <p className="font-medium">{browserDetails.pixelRatio}x</p>
-                                    </div>
-                                    <div>
-                                        <span className="text-sm text-muted-foreground">Color Depth:</span>
-                                        <p className="font-medium">{browserDetails.colorDepth} bits</p>
-                                    </div>
-                                    <div>
-                                        <span className="text-sm text-muted-foreground">WebGL Support:</span>
-                                        <p className="font-medium">
-                                            {browserDetails.webglSupported ? '✅ WebGL' : '❌ WebGL'}
-                                            {browserDetails.webgl2Supported ? ' ✅ WebGL2' : ' ❌ WebGL2'}
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Hardware Capabilities */}
-                            <div className="bg-card border border-border rounded-lg p-6">
-                                <h3 className="text-lg font-semibold text-foreground mb-4">⚡ Hardware</h3>
-                                <div className="space-y-3">
-                                    <div>
-                                        <span className="text-sm text-muted-foreground">CPU Cores:</span>
-                                        <p className="font-medium">{browserDetails.hardwareConcurrency}</p>
-                                    </div>
-                                    {browserDetails.deviceMemory && (
-                                        <div>
-                                            <span className="text-sm text-muted-foreground">Device Memory:</span>
-                                            <p className="font-medium">{browserDetails.deviceMemory} GB</p>
-                                        </div>
-                                    )}
-                                    <div>
-                                        <span className="text-sm text-muted-foreground">Touch Points:</span>
-                                        <p className="font-medium">{browserDetails.maxTouchPoints}</p>
-                                    </div>
-                                    <div>
-                                        <span className="text-sm text-muted-foreground">Input Support:</span>
-                                        <p className="font-medium text-sm">
-                                            {browserDetails.touchSupport ? '👆 Touch' : '❌ Touch'}
-                                            {browserDetails.pointerSupport ? ' 🖱️ Pointer' : ' ❌ Pointer'}
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Network & Connection */}
-                            <div className="bg-card border border-border rounded-lg p-6">
-                                <h3 className="text-lg font-semibold text-foreground mb-4">🌐 Network</h3>
-                                <div className="space-y-3">
-                                    <div>
-                                        <span className="text-sm text-muted-foreground">Online Status:</span>
-                                        <p className="font-medium">{browserDetails.onlineStatus ? '🟢 Online' : '🔴 Offline'}</p>
-                                    </div>
-                                    {browserDetails.ipAddress && (
-                                        <div>
-                                            <span className="text-sm text-muted-foreground">IP Address:</span>
-                                            <p className="font-medium">{browserDetails.ipAddress}</p>
-                                        </div>
-                                    )}
-                                    {browserDetails.effectiveType && (
-                                        <div>
-                                            <span className="text-sm text-muted-foreground">Connection:</span>
-                                            <p className="font-medium">{browserDetails.effectiveType}</p>
-                                        </div>
-                                    )}
-                                    {browserDetails.downlink && (
-                                        <div>
-                                            <span className="text-sm text-muted-foreground">Downlink:</span>
-                                            <p className="font-medium">{browserDetails.downlink} Mbps</p>
-                                        </div>
-                                    )}
-                                    {browserDetails.rtt && (
-                                        <div>
-                                            <span className="text-sm text-muted-foreground">RTT:</span>
-                                            <p className="font-medium">{browserDetails.rtt} ms</p>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-
-                            {/* Security & Privacy */}
-                            <div className="bg-card border border-border rounded-lg p-6">
-                                <h3 className="text-lg font-semibold text-foreground mb-4">🔒 Security & Privacy</h3>
-                                <div className="space-y-3">
-                                    <div>
-                                        <span className="text-sm text-muted-foreground">Cookies:</span>
-                                        <p className="font-medium">{browserDetails.cookiesEnabled ? '✅ Enabled' : '❌ Disabled'}</p>
-                                    </div>
-                                    <div>
-                                        <span className="text-sm text-muted-foreground">Do Not Track:</span>
-                                        <p className="font-medium">{browserDetails.doNotTrack || 'Not set'}</p>
-                                    </div>
-                                    <div>
-                                        <span className="text-sm text-muted-foreground">Private Mode:</span>
-                                        <p className="font-medium">{browserDetails.privateMode ? '🕵️ Yes' : '👁️ No'}</p>
-                                    </div>
-                                    <div>
-                                        <span className="text-sm text-muted-foreground">Ad Blocker:</span>
-                                        <p className="font-medium">{browserDetails.adBlockerDetected ? '🛡️ Detected' : '❌ None'}</p>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Storage Support */}
-                            <div className="bg-card border border-border rounded-lg p-6">
-                                <h3 className="text-lg font-semibold text-foreground mb-4">💾 Storage</h3>
-                                <div className="space-y-3">
-                                    <div>
-                                        <span className="text-sm text-muted-foreground">Local Storage:</span>
-                                        <p className="font-medium">{browserDetails.localStorageAvailable ? '✅ Available' : '❌ Blocked'}</p>
-                                    </div>
-                                    <div>
-                                        <span className="text-sm text-muted-foreground">Session Storage:</span>
-                                        <p className="font-medium">{browserDetails.sessionStorageAvailable ? '✅ Available' : '❌ Blocked'}</p>
-                                    </div>
-                                    <div>
-                                        <span className="text-sm text-muted-foreground">IndexedDB:</span>
-                                        <p className="font-medium">{browserDetails.indexedDBAvailable ? '✅ Available' : '❌ Blocked'}</p>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Localization */}
-                            <div className="bg-card border border-border rounded-lg p-6">
-                                <h3 className="text-lg font-semibold text-foreground mb-4">🌍 Localization</h3>
-                                <div className="space-y-3">
-                                    <div>
-                                        <span className="text-sm text-muted-foreground">Primary Language:</span>
-                                        <p className="font-medium">{browserDetails.language}</p>
-                                    </div>
-                                    <div>
-                                        <span className="text-sm text-muted-foreground">All Languages:</span>
-                                        <p className="font-medium text-sm">{browserDetails.languages.slice(0, 3).join(', ')}</p>
-                                    </div>
-                                    <div>
-                                        <span className="text-sm text-muted-foreground">Timezone:</span>
-                                        <p className="font-medium">{browserDetails.timezone}</p>
-                                    </div>
-                                    <div>
-                                        <span className="text-sm text-muted-foreground">Local Time:</span>
-                                        <p className="font-medium">{browserDetails.localTime}</p>
-                                    </div>
-                                </div>
-                            </div>
-
-                        </div>
-
-
-                        {/* Advanced Technical Details Cards */}
-
-                        {/* Advanced - Combined Performance & Location */}
-                        <div className="bg-card border border-border rounded-lg p-6">
-                            <h3 className="text-lg font-semibold text-foreground mb-4">⚡ Advanced</h3>
-                            <div className="space-y-4">
-                                {/* Performance Section */}
-                                <div className="space-y-3">
-                                    <div>
-                                        <span className="text-sm text-muted-foreground">Load Time:</span>
-                                        <p className="font-medium">{browserDetails.loadTime.toFixed(2)} ms</p>
-                                    </div>
-                                    <div>
-                                        <span className="text-sm text-muted-foreground">Plugins Count:</span>
-                                        <p className="font-medium">{browserDetails.plugins.length}</p>
-                                    </div>
-                                </div>
-
-                                {/* Location Section */}
+                                <TableSectionHeader title="Security & Privacy" icon="🔒" />
+                                <TableRow label="JavaScript Enabled" value={browserDetails.javascriptEnabled ? '✅ Enabled' : '❌ Disabled'} />
+                                <TableRow label="Cookies Enabled" value={browserDetails.cookiesEnabled ? '✅ Enabled' : '❌ Disabled'} />
+                                <TableRow label="Third-Party Cookies" value={browserDetails.thirdPartyCookiesEnabled ? '✅ Enabled' : '❌ Blocked'} />
+                                <TableRow label="Do Not Track" value={browserDetails.doNotTrack || 'Not set'} />
+                                <TableRow label="Private Mode" value={browserDetails.privateMode ? '🕵️ Yes' : '👁️ No'} />
+                                <TableRow label="Ad Blocker" value={browserDetails.adBlockerDetected ? '🛡️ Detected' : '❌ None'} />
+                                
+                                <TableSectionHeader title="Advanced Details" icon="⚙️" />
+                                <TableRow label="Language" value={browserDetails.language} />
+                                <TableRow label="Timezone" value={browserDetails.timezone} />
+                                <TableRow label="Local Storage" value={browserDetails.localStorageAvailable ? '✅ Available' : '❌ Blocked'} />
+                                <TableRow label="Page Load Time" value={`${browserDetails.loadTime.toFixed(2)} ms`} />
                                 {browserDetails.geolocation && (
-                                    <div className="space-y-3">
-                                        {browserDetails.geolocation.locationName && browserDetails.geolocation.locationName !== 'Unknown Location' ? (
-                                            <div>
-                                                <span className="text-sm text-muted-foreground">Location:</span>
-                                                <p className="font-medium">{browserDetails.geolocation.locationName}</p>
-                                            </div>
-                                        ) : (
-                                            <div>
-                                                <span className="text-sm text-muted-foreground">Coordinates:</span>
-                                                <p className="font-medium text-sm">
-                                                    {browserDetails.geolocation.latitude.toFixed(4)}, {browserDetails.geolocation.longitude.toFixed(4)}
-                                                </p>
-                                            </div>
-                                        )}
-                                    </div>
+                                    <>
+                                        <TableRow
+                                            label="Location"
+                                            value={
+                                                browserDetails.geolocation.locationName && browserDetails.geolocation.locationName !== 'Unknown Location'
+                                                    ? browserDetails.geolocation.locationName
+                                                    : `${browserDetails.geolocation.latitude.toFixed(4)}, ${browserDetails.geolocation.longitude.toFixed(4)}`
+                                            }
+                                        />
+                                        <TableRow label="Location Accuracy" value={`±${browserDetails.geolocation.accuracy.toFixed(0)}m`} />
+                                    </>
                                 )}
-                            </div>
-                        </div>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </main>

@@ -46,6 +46,8 @@ export interface ComprehensiveBrowserDetails {
   
   // Browser Features & Support
   cookiesEnabled: boolean;
+  thirdPartyCookiesEnabled: boolean;
+  javascriptEnabled: boolean;
   javaEnabled: boolean;
   webglSupported: boolean;
   webgl2Supported: boolean;
@@ -156,6 +158,8 @@ export class BrowserDetector {
       
       // Browser Features & Support
       cookiesEnabled: navigator.cookieEnabled,
+      thirdPartyCookiesEnabled: await this.getThirdPartyCookiesEnabled(),
+      javascriptEnabled: this.getJavaScriptEnabled(),
       javaEnabled: typeof (window as any).java !== 'undefined',
       ...this.getGraphicsSupport(),
       touchSupport: this.getTouchSupport(),
@@ -431,6 +435,66 @@ export class BrowserDetector {
   
   private getPointerSupport(): boolean {
     return 'onpointerdown' in window;
+  }
+
+  private getJavaScriptEnabled(): boolean {
+    // If this code is running, JavaScript is enabled
+    // But we can also check for basic JavaScript features
+    try {
+      return typeof eval !== 'undefined' && 
+             typeof Function !== 'undefined' && 
+             typeof JSON !== 'undefined';
+    } catch (e) {
+      return false;
+    }
+  }
+
+  private async getThirdPartyCookiesEnabled(): Promise<boolean> {
+    try {
+      // Test if third-party cookies are enabled by trying to create and read a cookie
+      // in a cross-origin context simulation
+      
+      // First check if cookies are enabled at all
+      if (!navigator.cookieEnabled) {
+        return false;
+      }
+
+      // Try to detect third-party cookie blocking using various methods
+      // Method 1: Check if Storage Access API is available (indicates third-party restrictions)
+      if ('requestStorageAccess' in document) {
+        try {
+          // If requestStorageAccess exists, it suggests third-party context restrictions
+          const permission = await navigator.permissions.query({ name: 'storage-access' as any });
+          return permission.state === 'granted';
+        } catch (e) {
+          // If the API throws, assume restricted
+        }
+      }
+
+      // Method 2: Try to detect SameSite restrictions
+      try {
+        // Set a test cookie and try to read it
+        const testCookieName = 'third_party_test_' + Date.now();
+        document.cookie = `${testCookieName}=test; SameSite=None; Secure`;
+        
+        // Small delay to allow cookie to be set
+        await new Promise(resolve => setTimeout(resolve, 10));
+        
+        const cookieExists = document.cookie.indexOf(testCookieName) !== -1;
+        
+        // Clean up test cookie
+        document.cookie = `${testCookieName}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=None; Secure`;
+        
+        return cookieExists;
+      } catch (e) {
+        // If cookie setting fails, assume third-party cookies are blocked
+        return false;
+      }
+
+    } catch (error) {
+      console.warn('Third-party cookie detection failed:', error);
+      return false;
+    }
   }
   
   private getTimezoneInfo() {
