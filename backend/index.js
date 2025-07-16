@@ -1,16 +1,25 @@
 import express from 'express';
 import nodemailer from 'nodemailer';
 import dotenv from 'dotenv';
+import cors from 'cors';
 
 dotenv.config();
 
 const app = express();
+
+// ✅ Apply CORS middleware before routes
+app.use(cors({
+  origin: 'http://localhost:5173', // or '*' for all (dev only)
+  methods: ['GET', 'POST'],
+  allowedHeaders: ['Content-Type'],
+}));
+
 app.use(express.json());
 
 const transporter = nodemailer.createTransport({
   host: 'smtp.gmail.com',
   port: 587,
-  secure: false, // use TLS
+  secure: false,
   auth: {
     user: process.env.SMTP_USER,
     pass: process.env.SMTP_PASS,
@@ -26,7 +35,7 @@ app.post('/send-email', async (req, res) => {
 
   try {
     const info = await transporter.sendMail({
-      from: `"EPYC Mailer" <${process.env.SMTP_USER}>`,
+      from: `"EPYC Browser Detection" <${process.env.SMTP_USER}>`,
       to,
       subject,
       html,
