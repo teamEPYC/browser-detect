@@ -237,7 +237,7 @@ export default function Detect() {
                         </button>
                     </div>
 
-                    <div className="border border-gray-200 border-muted rounded-lg overflow-hidden">
+                    <div className="border border-gray-200 border-t-0 rounded-lg overflow-hidden">
                         <table className="w-full text-sm">
                             <tbody>
                                 <TableSectionHeader title="Browser Information" icon="🌐" />
