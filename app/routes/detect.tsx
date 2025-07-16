@@ -1,6 +1,9 @@
 import { useState, useEffect } from "react";
+import { useParams, useNavigate } from "react-router";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
+import { saveBrowserDetection, getBrowserDetection } from "../lib/database";
+import { v4 as uuidv4 } from 'uuid';
 
 interface BrowserDetails {
     userAgent: string;
@@ -25,20 +28,29 @@ interface BrowserDetails {
 }
 
 export default function Detect() {
+    const { id } = useParams<{ id?: string }>();
+    const navigate = useNavigate();
     const [browserDetails, setBrowserDetails] = useState<BrowserDetails | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [shareableUrl, setShareableUrl] = useState("");
     const [copied, setCopied] = useState(false);
+    const [isExistingDetection, setIsExistingDetection] = useState(false);
 
     useEffect(() => {
-        collectBrowserDetails();
-    }, []);
+        if (id) {
+            loadExistingDetection(id);
+        } else {
+            collectBrowserDetails();
+        }
+    }, [id]);
 
     const collectBrowserDetails = async () => {
+        console.log('🔍 Starting browser detection...');
         try {
-            // Generate unique ID
-            const uniqueId = generateUniqueId();
-            
+            // Generate unique ID using UUID
+            const uniqueId = uuidv4();
+            console.log('📝 Generated UUID:', uniqueId);
+
             // Collect browser details
             const details: BrowserDetails = {
                 userAgent: navigator.userAgent,
@@ -63,14 +75,38 @@ export default function Detect() {
             };
 
             setBrowserDetails(details);
-            
-            // Generate shareable URL
-            const shareableUrl = `${window.location.origin}/detect/${uniqueId}`;
-            setShareableUrl(shareableUrl);
-            
-            // TODO: Save to database
-            // await saveToDatabase(details);
-            
+
+            // Prepare data for saving
+            const detectionData = {
+                ...details,
+                deviceType: getDeviceType(),
+                viewportSize: `${window.innerWidth}x${window.innerHeight}`,
+                colorDepth: screen.colorDepth,
+                pixelDepth: screen.pixelDepth,
+                maxTouchPoints: navigator.maxTouchPoints || 0,
+                javaEnabled: typeof (window as any).java !== 'undefined',
+                onlineStatus: navigator.onLine,
+                referrer: document.referrer,
+                url: window.location.href
+            };
+
+            // Save to Supabase database
+            try {
+                const savedDetection = await saveBrowserDetection(detectionData);
+                const shareableUrl = `${window.location.origin}/detect/${savedDetection.id}`;
+                setShareableUrl(shareableUrl);
+
+                // Update the URL without page reload
+                window.history.replaceState({}, '', `/detect/${savedDetection.id}`);
+
+            } catch (error) {
+                console.error('Error saving to database:', error);
+                // Fallback to local unique ID if database save fails
+                const shareableUrl = `${window.location.origin}/detect/${uniqueId}`;
+                setShareableUrl(shareableUrl);
+                window.history.replaceState({}, '', `/detect/${uniqueId}`);
+            }
+
         } catch (error) {
             console.error('Error collecting browser details:', error);
         } finally {
@@ -78,8 +114,32 @@ export default function Detect() {
         }
     };
 
-    const generateUniqueId = () => {
-        return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+    const loadExistingDetection = async (detectionId: string) => {
+        try {
+            const detection = await getBrowserDetection(detectionId);
+            if (detection) {
+                // Convert BrowserDetectionData to BrowserDetails format
+                const browserDetails: BrowserDetails = {
+                    ...detection.detection_data,
+                    uniqueId: detection.id,
+                    timestamp: detection.created_at
+                };
+                setBrowserDetails(browserDetails);
+                setShareableUrl(`${window.location.origin}/detect/${detectionId}`);
+                setIsExistingDetection(true);
+            } else {
+                // If detection not found, start new detection
+                console.log('Detection not found, creating new detection');
+                collectBrowserDetails();
+                return;
+            }
+        } catch (error) {
+            console.error('Error loading existing detection:', error);
+            // Fallback to new detection
+            collectBrowserDetails();
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     const getBrowserInfo = () => {
@@ -134,6 +194,18 @@ export default function Detect() {
         return { name, version };
     };
 
+    const getDeviceType = () => {
+        const userAgent = navigator.userAgent;
+
+        if (/tablet|ipad|playbook|silk/i.test(userAgent)) {
+            return "tablet";
+        } else if (/mobile|iphone|ipod|android|blackberry|opera|mini|windows\sce|palm|smartphone|iemobile/i.test(userAgent)) {
+            return "mobile";
+        } else {
+            return "desktop";
+        }
+    };
+
     const copyToClipboard = async () => {
         try {
             await navigator.clipboard.writeText(shareableUrl);
@@ -168,33 +240,15 @@ export default function Detect() {
     return (
         <div className="min-h-screen bg-background">
             <Header />
-            <main className="container mx-auto px-4 py-12">
+            <main className="container mx-auto px-4 py-16">
                 <div className="max-w-4xl mx-auto">
-                    <div className="text-center mb-12">
+                    <div className="text-center mb-12 pt-12">
                         <h1 className="text-4xl font-bold text-foreground mb-4">Your Browser Details</h1>
                         <p className="text-lg text-muted-foreground">Share this information with our team for faster debugging</p>
                     </div>
 
                     {browserDetails && (
                         <div className="space-y-8">
-                            {/* Shareable URL Section */}
-                            <div className="bg-card border border-border rounded-lg p-6">
-                                <h2 className="text-xl font-semibold text-foreground mb-4">Shareable Link</h2>
-                                <div className="flex gap-3">
-                                    <input
-                                        type="text"
-                                        value={shareableUrl}
-                                        readOnly
-                                        className="flex-1 px-3 py-2 border border-border rounded-md bg-muted text-foreground"
-                                    />
-                                    <button
-                                        onClick={copyToClipboard}
-                                        className="px-4 py-2 bg-brand-900 text-primary-foreground rounded-md hover:bg-brand-700 transition-colors"
-                                    >
-                                        {copied ? "Copied!" : "Copy"}
-                                    </button>
-                                </div>
-                            </div>
 
                             {/* Browser Details Grid */}
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -284,19 +338,25 @@ export default function Detect() {
                             </div>
 
                             {/* Action Buttons */}
-                            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                            <div className="flex flex-col sm:flex-row gap-4 justify-center mt-12">
+                                <button
+                                    onClick={copyToClipboard}
+                                    className="inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 text-primary-foreground  h-9 rounded-md px-3 bg-gradient-to-br from-brand-900 to-brand-800 hover:from-brand-800 hover:to-brand-900 min-w-30 shadow-elegant hover:shadow-glow transition-all duration-300 text-white cursor-pointer"
+                                >
+                                    {copied ? " Copied to Clipboard!" : "Copy Link"}
+                                </button>
                                 <button
                                     onClick={emailUs}
-                                    className="px-6 py-3 bg-brand-900 text-primary-foreground rounded-lg hover:bg-brand-700 transition-colors"
+                                    className="inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 text-primary-foreground h-9 rounded-md px-3 bg-gradient-to-br from-brand-900 to-brand-800 hover:from-brand-800 hover:to-brand-900 min-w-30 shadow-elegant hover:shadow-glow transition-all duration-300 text-white cursor-pointer"
                                 >
                                     Email Us
                                 </button>
-                                <a
-                                    href="/"
-                                    className="px-6 py-3 bg-secondary text-secondary-foreground rounded-lg hover:bg-secondary/90 transition-colors text-center"
+                                <button
+                                    onClick={() => navigate('/')}
+                                    className="px-6 bg-secondary text-secondary-foreground rounded-lg hover:bg-secondary/90 transition-colors cursor-pointer hover:underline"
                                 >
                                     Back to Home
-                                </a>
+                                </button>
                             </div>
                         </div>
                     )}
