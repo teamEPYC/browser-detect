@@ -28,6 +28,10 @@
   @apply bg-[#971c40];
 }
 
+.bg-alternate-row {
+  @apply bg-[#edededc4];
+}
+
 html,
 body {
   @apply bg-white dark:bg-gray-950;

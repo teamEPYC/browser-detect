@@ -1,5 +1,5 @@
 import { Link } from "react-router";
-import { MonitorIcon, MailIcon, GithubIcon, TwitterIcon, LinkedinIcon, InstagramIcon } from "./icons";
+import { MonitorIcon, TwitterIcon, LinkedinIcon, InstagramIcon } from "./icons";
 
 export default function Footer() {
     return (
