@@ -552,30 +552,291 @@ export class BrowserDetector {
     return blocked;
   }
   
-  private async detectPrivateMode(): Promise<boolean> {
-    try {
-      // Test for private mode by trying to use localStorage
-      if (navigator.userAgent.includes('Safari') && !navigator.userAgent.includes('Chrome')) {
+
+
+  // Replace your existing detectPrivateMode method with this enhanced version
+private async detectPrivateMode(): Promise<boolean> {
+  try {
+    console.log('🔍 Starting enhanced private mode detection...');
+
+    // Get browser type for targeted detection
+    const userAgent = navigator.userAgent.toLowerCase();
+    const browserInfo = {
+      isChrome: userAgent.includes('chrome') && !userAgent.includes('edg') && !userAgent.includes('opr'),
+      isFirefox: userAgent.includes('firefox'),
+      isSafari: userAgent.includes('safari') && !userAgent.includes('chrome'),
+      isEdge: userAgent.includes('edg'),
+      isOpera: userAgent.includes('opr') || userAgent.includes('opera')
+    };
+
+    console.log('🌐 Browser detection:', browserInfo);
+
+    // Method 1: Storage Quota API (Most reliable for Chromium browsers)
+    if (browserInfo.isChrome || browserInfo.isEdge || browserInfo.isOpera) {
+      try {
+        if ('storage' in navigator && 'estimate' in navigator.storage) {
+          const estimate = await navigator.storage.estimate();
+          const quotaMB = estimate.quota ? (estimate.quota / (1024 * 1024)).toFixed(2) : 0;
+          
+          console.log(`💾 Storage quota: ${quotaMB} MB (${estimate.quota} bytes)`);
+          
+          // Chrome/Edge normal mode: typically 50GB+ (50,000+ MB)
+          // Chrome/Edge incognito mode: typically 10-20MB
+          if (estimate.quota && estimate.quota < 100 * 1024 * 1024) { // Less than 100MB
+            console.log('✅ Private mode detected via storage quota (Chromium)');
+            return true;
+          } else {
+            console.log('🔓 Normal mode detected via storage quota (Chromium)');
+            return false;
+          }
+        } else {
+          console.log('❌ Storage.estimate() not available in Chromium browser');
+        }
+      } catch (e) {
+        console.log('❌ Storage quota test failed:', e);
+      }
+    }
+
+    // Method 2: Firefox-specific IndexedDB test
+    if (browserInfo.isFirefox) {
+      try {
+        const isPrivateFirefox = await new Promise<boolean>((resolve) => {
+          let resolved = false;
+          const dbName = `firefox_private_test_${Date.now()}`;
+          
+          try {
+            const request = indexedDB.open(dbName, 1);
+            
+            request.onerror = (e) => {
+              if (!resolved) {
+                resolved = true;
+                console.log('✅ Private mode detected via Firefox IndexedDB error');
+                resolve(true); // Error indicates private mode in Firefox
+              }
+            };
+            
+            request.onupgradeneeded = () => {
+              try {
+                const db = request.result;
+                const store = db.createObjectStore('test', { keyPath: 'id' });
+                store.add({ id: 1, data: 'test' });
+              } catch (e) {
+                if (!resolved) {
+                  resolved = true;
+                  console.log('✅ Private mode detected via Firefox IndexedDB creation failure');
+                  resolve(true);
+                }
+              }
+            };
+            
+            request.onsuccess = () => {
+              if (!resolved) {
+                resolved = true;
+                try {
+                  const db = request.result;
+                  db.close();
+                  indexedDB.deleteDatabase(dbName);
+                  console.log('🔓 Normal mode detected via Firefox IndexedDB success');
+                  resolve(false); // Success indicates normal mode
+                } catch (e) {
+                  console.log('✅ Private mode detected via Firefox IndexedDB cleanup failure');
+                  resolve(true);
+                }
+              }
+            };
+            
+            // Timeout fallback
+            setTimeout(() => {
+              if (!resolved) {
+                resolved = true;
+                console.log('⏰ Firefox IndexedDB test timeout - assuming normal mode');
+                resolve(false);
+              }
+            }, 1000);
+            
+          } catch (e) {
+            console.log('✅ Private mode detected via Firefox IndexedDB exception:', e);
+            resolve(true);
+          }
+        });
+
+        return isPrivateFirefox;
+        
+      } catch (e) {
+        console.log('❌ Firefox private mode detection failed:', e);
+      }
+    }
+
+    // Method 3: Safari-specific localStorage quota test
+    if (browserInfo.isSafari) {
+      try {
+        const testKey = `safari_private_test_${Date.now()}`;
+        
+        // Try to store data that would exceed Safari private mode quota
+        const testData = 'x'.repeat(1024 * 10); // 10KB test data
+        
         try {
-          localStorage.setItem('test', '1');
-          localStorage.removeItem('test');
-          return false;
+          localStorage.setItem(testKey, testData);
+          const retrieved = localStorage.getItem(testKey);
+          
+          // Clean up
+          localStorage.removeItem(testKey);
+          
+          if (retrieved === testData) {
+            console.log('🔓 Normal mode detected via Safari localStorage success');
+            return false;
+          } else {
+            console.log('✅ Private mode detected via Safari localStorage retrieval failure');
+            return true;
+          }
+          
         } catch (e) {
+          console.log('✅ Private mode detected via Safari localStorage exception:', e.name);
+          
+          // Safari private mode throws QuotaExceededError
+          if (e.name === 'QuotaExceededError' || e.name === 'NS_ERROR_DOM_QUOTA_REACHED') {
+            return true;
+          }
+          
+          // Other errors might also indicate private mode
           return true;
+        }
+        
+      } catch (e) {
+        console.log('❌ Safari private mode detection failed:', e);
+      }
+    }
+
+    // Method 4: Fallback tests for unknown browsers or when primary method fails
+    console.log('🔄 Running fallback detection methods...');
+
+    // Fallback A: Try IndexedDB for any browser
+    try {
+      const indexedDBTest = await new Promise<boolean>((resolve) => {
+        try {
+          const dbName = `fallback_test_${Date.now()}`;
+          const request = indexedDB.open(dbName, 1);
+          
+          let resolved = false;
+          
+          request.onerror = () => {
+            if (!resolved) {
+              resolved = true;
+              resolve(true); // Error suggests private mode
+            }
+          };
+          
+          request.onsuccess = () => {
+            if (!resolved) {
+              resolved = true;
+              try {
+                request.result.close();
+                indexedDB.deleteDatabase(dbName);
+                resolve(false); // Success suggests normal mode
+              } catch (e) {
+                resolve(true);
+              }
+            }
+          };
+          
+          setTimeout(() => {
+            if (!resolved) {
+              resolved = true;
+              resolve(false); // Timeout assumes normal mode
+            }
+          }, 500);
+          
+        } catch (e) {
+          resolve(true);
+        }
+      });
+
+      if (indexedDBTest) {
+        console.log('✅ Private mode detected via fallback IndexedDB test');
+        return true;
+      }
+    } catch (e) {
+      console.log('🔄 Fallback IndexedDB test failed:', e);
+    }
+
+    // Fallback B: Large sessionStorage test
+    try {
+      const largeData = 'x'.repeat(2 * 1024 * 1024); // 2MB
+      const testKey = `large_storage_test_${Date.now()}`;
+      
+      sessionStorage.setItem(testKey, largeData);
+      const retrieved = sessionStorage.getItem(testKey);
+      sessionStorage.removeItem(testKey);
+      
+      if (retrieved !== largeData) {
+        console.log('✅ Private mode detected via sessionStorage size limit');
+        return true;
+      }
+    } catch (e) {
+      console.log('✅ Private mode detected via sessionStorage exception:', e.name);
+      return true;
+    }
+
+    // Fallback C: Multiple localStorage operations test
+    try {
+      const baseKey = `multi_test_${Date.now()}`;
+      const testData = 'test_data_' + Math.random();
+      
+      // Test multiple rapid localStorage operations
+      for (let i = 0; i < 5; i++) {
+        localStorage.setItem(`${baseKey}_${i}`, testData + i);
+      }
+      
+      // Verify all items were stored
+      let allStored = true;
+      for (let i = 0; i < 5; i++) {
+        if (localStorage.getItem(`${baseKey}_${i}`) !== testData + i) {
+          allStored = false;
+          break;
         }
       }
       
-      // For other browsers, try indexedDB
-      return new Promise((resolve) => {
-        const db = indexedDB.open('test');
-        db.onerror = () => resolve(true);
-        db.onsuccess = () => resolve(false);
-      });
+      // Clean up
+      for (let i = 0; i < 5; i++) {
+        localStorage.removeItem(`${baseKey}_${i}`);
+      }
+      
+      if (!allStored) {
+        console.log('✅ Private mode detected via localStorage consistency test');
+        return true;
+      }
     } catch (e) {
-      return false;
+      console.log('✅ Private mode detected via localStorage multi-operation test:', e);
+      return true;
     }
+
+    console.log('🔓 No private mode indicators found - assuming normal mode');
+    return false;
+
+  } catch (error) {
+    console.warn('❌ Private mode detection failed completely:', error);
+    return false; // Default to normal mode if detection fails
   }
-  
+}
+
+// Helper methods (add these if they don't already exist in your class)
+private isSafari(): boolean {
+  return /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+}
+
+private isChrome(): boolean {
+  return /chrome/i.test(navigator.userAgent) && !/edg/i.test(navigator.userAgent);
+}
+
+private isEdge(): boolean {
+  return /edg/i.test(navigator.userAgent);
+}
+
+private isFirefox(): boolean {
+  return /firefox/i.test(navigator.userAgent);
+}
+
+
   private getPlugins(): string[] {
     return Array.from(navigator.plugins).map(plugin => plugin.name);
   }
