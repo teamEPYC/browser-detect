@@ -49,6 +49,12 @@ app.post('/send-email', async (req, res) => {
   }
 });
 
-// app.listen(process.env.PORT, () => {
-//   console.log(`🚀 Server running at http://localhost:${process.env.PORT}`);
-// });
+app.get("/", (req, res) => {
+  res.send("Browser Detect API is running");
+});
+
+const PORT = process.env.PORT || 3000;
+
+app.listen(PORT, () => {
+  console.log(`🚀 Server running at http://localhost:${PORT}`);
+});
