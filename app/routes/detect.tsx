@@ -1,138 +1,200 @@
-import { useState, useEffect } from "react";
+import { useLoaderData, useNavigate } from "react-router";
+import type { LoaderFunctionArgs } from "react-router";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
+import EmailService from "../components/EmailService";
+import { saveBrowserDetection, getBrowserDetection } from "../lib/database";
+import { BrowserDetector, type ComprehensiveBrowserDetails } from "../lib/browser-detection";
+import { CopyIcon, HomeIcon, BrowserIcon, ComputerIcon, MonitorIcon2, ZapIcon, WifiIcon, ShieldIcon, SettingsIcon, DatabaseIcon, GlobeIcon2, PlugIcon, MapPinIcon } from "../components/icons";
+import { useState, useCallback, useRef } from "react";
 
-interface BrowserDetails {
-    userAgent: string;
-    browser: string;
-    browserVersion: string;
-    os: string;
-    osVersion: string;
-    platform: string;
-    screenResolution: string;
-    pixelRatio: number;
-    timezone: string;
-    localTime: string;
-    language: string;
-    languages: string[];
-    touchSupport: boolean;
-    deviceMemory?: number;
-    hardwareConcurrency?: number;
-    connectionType?: string;
-    cookiesEnabled: boolean;
-    uniqueId: string;
-    timestamp: string;
+// --- Helper Components for the new table layout ---
+
+export function meta() {
+    return [
+        { title: "Detect Your Browser Details – BrowserDetect by EPYC" },
+        {
+            name: "description",
+            content:
+                "View full browser and system information, copy a shareable link, or send it via email. Powered by BrowserDetect from EPYC.",
+        },
+        {
+            property: "og:title",
+            content: "Detect Your Browser Details – BrowserDetect by EPYC",
+        },
+        {
+            property: "og:description",
+            content:
+                "View full browser and system information, copy a shareable link, or send it via email. Powered by BrowserDetect from EPYC.",
+        },
+        {
+            name: "twitter:card",
+            content: "summary",
+        },
+        {
+            name: "twitter:title",
+            content: "Detect Your Browser Details – BrowserDetect by EPYC",
+        },
+        {
+            name: "twitter:description",
+            content:
+                "Use BrowserDetect to inspect and share your browser and system data for debugging or support purposes.",
+        },
+        {
+            rel: "canonical",
+            href: "https://browserdetect.epyc.in/detect",
+        },
+    ];
+}
+
+// Table Section Header Component
+const TableSectionHeader = ({ title, icon }: { title: string; icon: React.ReactNode; }) => (
+    <tr className="bg-muted/40 border-t-2 border-gray-200 border-muted">
+        <th colSpan={2} className="p-4 text-left text-xl font-bold text-foreground">
+            <div className="flex items-center gap-4">
+                <span className="text-2xl">{icon}</span>
+                <span>{title}</span>
+            </div>
+        </th>
+    </tr>
+);
+
+// Table Row Component
+const TableRow = ({ label, value, index }: { label: string; value: React.ReactNode; index: number; }) => {
+    if (value === null || value === undefined || value === '') return null;
+    const isEven = index % 2 === 0;
+    return (
+        <tr className={`border-b border-border border-gray-200 last:border-b-0 ${isEven ? 'bg-alternate-row' : 'bg-white'} hover:bg-brand-100/40 transition-colors`}>
+            <td className="p-4 font-semibold text-foreground w-1/3">{label}</td>
+            <td className="p-4 text-muted-foreground break-all">{value}</td>
+        </tr>
+    );
+};
+
+// Loader function - runs before component renders
+export async function loader({ params }: LoaderFunctionArgs) {
+    const { id } = params;
+
+    // If we have an ID, try to load existing detection
+    if (id) {
+        console.log('🔍 Loading existing detection:', id);
+        try {
+            const existingDetection = await getBrowserDetection(id);
+            if (existingDetection) {
+                return {
+                    type: 'existing' as const,
+                    data: existingDetection.detection_data,
+                    id: existingDetection.id,
+                    created_at: existingDetection.created_at,
+                    shareableUrl: `/detect/${id}` // Will be fixed on client-side
+                };
+            } else {
+                console.log('⚠️ Detection not found, will create new one');
+                return { type: 'new' as const };
+            }
+        } catch (error) {
+            console.error('Error loading detection:', error);
+            return { type: 'new' as const };
+        }
+    }
+
+    // No ID provided, create new detection
+    return { type: 'new' as const };
+}
+
+// Global flag to prevent multiple collections across all instances
+declare global {
+    interface Window {
+        browserDetectionInProgress?: boolean;
+    }
 }
 
 export default function Detect() {
-    const [browserDetails, setBrowserDetails] = useState<BrowserDetails | null>(null);
-    const [isLoading, setIsLoading] = useState(true);
-    const [shareableUrl, setShareableUrl] = useState("");
+    const loaderData = useLoaderData<typeof loader>();
+    const navigate = useNavigate();
+
+    // Protection flags
+    const collectionStartedRef = useRef(false);
+    const isCollectingRef = useRef(false);
+
+    // Initialize state - for existing detections, set data immediately
+    const [browserDetails, setBrowserDetails] = useState<ComprehensiveBrowserDetails | null>(
+        loaderData.type === 'existing' ? loaderData.data as ComprehensiveBrowserDetails : null
+    );
+
+    // Initialize and start collection for new detections
+    const [, setInitialized] = useState(() => {
+        // Only run on client-side for new detections
+        if (typeof window !== 'undefined' &&
+            loaderData.type === 'new' &&
+            !collectionStartedRef.current &&
+            !window.browserDetectionInProgress) {
+
+            // Set protection flags immediately
+            collectionStartedRef.current = true;
+            isCollectingRef.current = true;
+            window.browserDetectionInProgress = true;
+
+            // Start collection asynchronously (non-blocking)
+            setTimeout(() => startBrowserDetection(), 0);
+        }
+        return true;
+    });
+
+    const [shareableUrl, setShareableUrl] = useState(() => {
+        if (loaderData.type === 'existing') {
+            const baseUrl = loaderData.shareableUrl;
+            // If we're on client-side and URL doesn't have domain, add it
+            if (typeof window !== 'undefined' && baseUrl && !baseUrl.startsWith('http')) {
+                return `${window.location.origin}${baseUrl}`;
+            }
+            return baseUrl;
+        }
+        return "";
+    });
+
     const [copied, setCopied] = useState(false);
+    const [isCollecting, setIsCollecting] = useState(
+        loaderData.type === 'new' && !browserDetails
+    );
 
-    useEffect(() => {
-        collectBrowserDetails();
-    }, []);
+    // Browser detection function (extracted from previous useEffect logic)
+    const startBrowserDetection = useCallback(async () => {
+        if (typeof window === 'undefined') return; // SSR guard
 
-    const collectBrowserDetails = async () => {
+        console.log('🔍 Starting comprehensive browser detection...');
+
         try {
-            // Generate unique ID
-            const uniqueId = generateUniqueId();
-            
-            // Collect browser details
-            const details: BrowserDetails = {
-                userAgent: navigator.userAgent,
-                browser: getBrowserInfo().name,
-                browserVersion: getBrowserInfo().version,
-                os: getOSInfo().name,
-                osVersion: getOSInfo().version,
-                platform: navigator.platform,
-                screenResolution: `${screen.width}x${screen.height}`,
-                pixelRatio: window.devicePixelRatio,
-                timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-                localTime: new Date().toLocaleString(),
-                language: navigator.language,
-                languages: Array.from(navigator.languages),
-                touchSupport: 'ontouchstart' in window,
-                deviceMemory: (navigator as any).deviceMemory,
-                hardwareConcurrency: navigator.hardwareConcurrency,
-                connectionType: (navigator as any).connection?.effectiveType,
-                cookiesEnabled: navigator.cookieEnabled,
-                uniqueId,
-                timestamp: new Date().toISOString()
-            };
+            const detector = BrowserDetector.getInstance();
+            const details = await detector.collectAllDetails();
 
+            console.log('📊 Collected browser details:', details);
             setBrowserDetails(details);
-            
-            // Generate shareable URL
-            const shareableUrl = `${window.location.origin}/detect/${uniqueId}`;
-            setShareableUrl(shareableUrl);
-            
-            // TODO: Save to database
-            // await saveToDatabase(details);
-            
+
+            // Save to database
+            try {
+                const savedDetection = await saveBrowserDetection(details);
+                const newShareableUrl = `${window.location.origin}/detect/${savedDetection.id}`;
+                setShareableUrl(newShareableUrl);
+
+                // Update URL without page reload
+                window.history.replaceState({}, '', `/detect/${savedDetection.id}`);
+                console.log('✅ Saved to database with ID:', savedDetection.id);
+            } catch (error) {
+                console.error('❌ Error saving to database:', error);
+                // Fallback URL with generated ID
+                const fallbackUrl = `${window.location.origin}/detect/${details.uniqueId}`;
+                setShareableUrl(fallbackUrl);
+                window.history.replaceState({}, '', `/detect/${details.uniqueId}`);
+            }
         } catch (error) {
             console.error('Error collecting browser details:', error);
         } finally {
-            setIsLoading(false);
+            setIsCollecting(false);
+            isCollectingRef.current = false;
+            // Keep protection flags set to prevent any future attempts
         }
-    };
-
-    const generateUniqueId = () => {
-        return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-    };
-
-    const getBrowserInfo = () => {
-        const userAgent = navigator.userAgent;
-        let name = "Unknown";
-        let version = "Unknown";
-
-        if (userAgent.includes("Chrome")) {
-            name = "Chrome";
-            version = userAgent.match(/Chrome\/(\d+)/)?.[1] || "Unknown";
-        } else if (userAgent.includes("Firefox")) {
-            name = "Firefox";
-            version = userAgent.match(/Firefox\/(\d+)/)?.[1] || "Unknown";
-        } else if (userAgent.includes("Safari")) {
-            name = "Safari";
-            version = userAgent.match(/Version\/(\d+)/)?.[1] || "Unknown";
-        } else if (userAgent.includes("Edge")) {
-            name = "Edge";
-            version = userAgent.match(/Edge\/(\d+)/)?.[1] || "Unknown";
-        }
-
-        return { name, version };
-    };
-
-    const getOSInfo = () => {
-        const userAgent = navigator.userAgent;
-        let name = "Unknown";
-        let version = "Unknown";
-
-        if (userAgent.includes("Windows")) {
-            name = "Windows";
-            if (userAgent.includes("Windows NT 10.0")) version = "10";
-            else if (userAgent.includes("Windows NT 6.3")) version = "8.1";
-            else if (userAgent.includes("Windows NT 6.2")) version = "8";
-            else if (userAgent.includes("Windows NT 6.1")) version = "7";
-        } else if (userAgent.includes("Mac")) {
-            name = "macOS";
-            const match = userAgent.match(/Mac OS X (\d+_\d+)/);
-            if (match) version = match[1].replace('_', '.');
-        } else if (userAgent.includes("Linux")) {
-            name = "Linux";
-        } else if (userAgent.includes("Android")) {
-            name = "Android";
-            const match = userAgent.match(/Android (\d+)/);
-            if (match) version = match[1];
-        } else if (userAgent.includes("iOS")) {
-            name = "iOS";
-            const match = userAgent.match(/OS (\d+_\d+)/);
-            if (match) version = match[1].replace('_', '.');
-        }
-
-        return { name, version };
-    };
+    }, []); // No dependencies needed since we're not using this in useEffect
 
     const copyToClipboard = async () => {
         try {
@@ -144,20 +206,20 @@ export default function Detect() {
         }
     };
 
-    const emailUs = () => {
-        const subject = "Browser Details for Debugging";
-        const body = `Please find my browser details at: ${shareableUrl}\n\nBrowser Details:\n${JSON.stringify(browserDetails, null, 2)}`;
-        window.location.href = `mailto:support@epyc.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-    };
-
-    if (isLoading) {
+    // Loading state - same as before
+    if (isCollecting || !browserDetails) {
         return (
             <div className="min-h-screen bg-background">
                 <Header />
                 <main className="flex items-center justify-center min-h-[60vh]">
                     <div className="text-center">
-                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-                        <p className="text-lg text-muted-foreground">Collecting your browser details...</p>
+                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-900 mx-auto mb-4"></div>
+                        <p className="text-lg text-muted-foreground">
+                            {loaderData.type === 'existing' ? 'Loading browser details...' : 'Collecting comprehensive browser details...'}
+                        </p>
+                        <p className="text-sm text-muted-foreground mt-2">
+                            Gathering {loaderData.type === 'new' ? '50+' : ''} data points about your browser and device
+                        </p>
                     </div>
                 </main>
                 <Footer />
@@ -165,144 +227,105 @@ export default function Detect() {
         );
     }
 
+    // Main UI - with new "Table Report" layout
     return (
         <div className="min-h-screen bg-background">
             <Header />
-            <main className="container mx-auto px-4 py-12">
+            <main className="container mx-auto px-4 py-16">
                 <div className="max-w-4xl mx-auto">
-                    <div className="text-center mb-12">
-                        <h1 className="text-4xl font-bold text-foreground mb-4">Your Browser Details</h1>
-                        <p className="text-lg text-muted-foreground">Share this information with our team for faster debugging</p>
+                    <div className="text-center mb-12 pt-12">
+                        <h1 className="text-4xl font-bold text-foreground mb-4">
+                            {loaderData.type === 'existing' ? 'Shared Browser Details' : 'Your Browser Details'}
+                        </h1>
+                        <p className="text-lg text-muted-foreground">
+                            {loaderData.type === 'existing'
+                                ? `Detected on ${new Date(loaderData.created_at).toLocaleString()}`
+                                : 'Complete technical profile for debugging and support'
+                            }
+                        </p>
                     </div>
 
-                    {browserDetails && (
-                        <div className="space-y-8">
-                            {/* Shareable URL Section */}
-                            <div className="bg-card border border-border rounded-lg p-6">
-                                <h2 className="text-xl font-semibold text-foreground mb-4">Shareable Link</h2>
-                                <div className="flex gap-3">
-                                    <input
-                                        type="text"
-                                        value={shareableUrl}
-                                        readOnly
-                                        className="flex-1 px-3 py-2 border border-border rounded-md bg-muted text-foreground"
-                                    />
-                                    <button
-                                        onClick={copyToClipboard}
-                                        className="px-4 py-2 bg-brand-900 text-primary-foreground rounded-md hover:bg-brand-700 transition-colors"
-                                    >
-                                        {copied ? "Copied!" : "Copy"}
-                                    </button>
-                                </div>
-                            </div>
+                    <div className="flex flex-col sm:flex-row gap-4 justify-center my-12">
+                        <button
+                            onClick={copyToClipboard}
+                            className="inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 text-primary-foreground h-9 rounded-md px-3 bg-brand-primary hover:bg-brand-hover min-w-30 shadow-elegant hover:shadow-glow transition-all duration-300 text-white cursor-pointer"
+                        >
+                            <CopyIcon />
+                            {copied ? "Copied to Clipboard!" : "Copy Link"}
+                        </button>
 
-                            {/* Browser Details Grid */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div className="bg-card border border-border rounded-lg p-6">
-                                    <h3 className="text-lg font-semibold text-foreground mb-4">Browser Information</h3>
-                                    <div className="space-y-3">
-                                        <div>
-                                            <span className="text-sm text-muted-foreground">Browser:</span>
-                                            <p className="font-medium">{browserDetails.browser} {browserDetails.browserVersion}</p>
-                                        </div>
-                                        <div>
-                                            <span className="text-sm text-muted-foreground">User Agent:</span>
-                                            <p className="font-medium text-sm break-all">{browserDetails.userAgent}</p>
-                                        </div>
-                                        <div>
-                                            <span className="text-sm text-muted-foreground">Cookies Enabled:</span>
-                                            <p className="font-medium">{browserDetails.cookiesEnabled ? "Yes" : "No"}</p>
-                                        </div>
-                                    </div>
-                                </div>
+                        <EmailService browserDetails={browserDetails} shareableUrl={shareableUrl} />
 
-                                <div className="bg-card border border-border rounded-lg p-6">
-                                    <h3 className="text-lg font-semibold text-foreground mb-4">System Information</h3>
-                                    <div className="space-y-3">
-                                        <div>
-                                            <span className="text-sm text-muted-foreground">Operating System:</span>
-                                            <p className="font-medium">{browserDetails.os} {browserDetails.osVersion}</p>
-                                        </div>
-                                        <div>
-                                            <span className="text-sm text-muted-foreground">Platform:</span>
-                                            <p className="font-medium">{browserDetails.platform}</p>
-                                        </div>
-                                        <div>
-                                            <span className="text-sm text-muted-foreground">Screen Resolution:</span>
-                                            <p className="font-medium">{browserDetails.screenResolution}</p>
-                                        </div>
-                                        <div>
-                                            <span className="text-sm text-muted-foreground">Pixel Ratio:</span>
-                                            <p className="font-medium">{browserDetails.pixelRatio}</p>
-                                        </div>
-                                    </div>
-                                </div>
+                    </div>
 
-                                <div className="bg-card border border-border rounded-lg p-6">
-                                    <h3 className="text-lg font-semibold text-foreground mb-4">Hardware & Performance</h3>
-                                    <div className="space-y-3">
-                                        <div>
-                                            <span className="text-sm text-muted-foreground">Hardware Concurrency:</span>
-                                            <p className="font-medium">{browserDetails.hardwareConcurrency || "Unknown"}</p>
-                                        </div>
-                                        <div>
-                                            <span className="text-sm text-muted-foreground">Device Memory:</span>
-                                            <p className="font-medium">{browserDetails.deviceMemory ? `${browserDetails.deviceMemory} GB` : "Unknown"}</p>
-                                        </div>
-                                        <div>
-                                            <span className="text-sm text-muted-foreground">Touch Support:</span>
-                                            <p className="font-medium">{browserDetails.touchSupport ? "Yes" : "No"}</p>
-                                        </div>
-                                        <div>
-                                            <span className="text-sm text-muted-foreground">Connection Type:</span>
-                                            <p className="font-medium">{browserDetails.connectionType || "Unknown"}</p>
-                                        </div>
-                                    </div>
-                                </div>
+                    <div className="border border-gray-200 border-t-0 rounded-lg overflow-hidden">
+                        <table className="w-full text-sm">
+                            <tbody>
+                                <TableSectionHeader title="Browser Information" icon={<BrowserIcon />} />
+                                <TableRow label="Browser" value={`${browserDetails.browser} ${browserDetails.browserVersion}`} index={1} />
+                                <TableRow label="Engine" value={browserDetails.browserEngine} index={2} />
+                                <TableRow label="User Agent" value={browserDetails.userAgent} index={3} />
 
-                                <div className="bg-card border border-border rounded-lg p-6">
-                                    <h3 className="text-lg font-semibold text-foreground mb-4">Localization</h3>
-                                    <div className="space-y-3">
-                                        <div>
-                                            <span className="text-sm text-muted-foreground">Language:</span>
-                                            <p className="font-medium">{browserDetails.language}</p>
-                                        </div>
-                                        <div>
-                                            <span className="text-sm text-muted-foreground">Languages:</span>
-                                            <p className="font-medium text-sm">{browserDetails.languages.join(", ")}</p>
-                                        </div>
-                                        <div>
-                                            <span className="text-sm text-muted-foreground">Timezone:</span>
-                                            <p className="font-medium">{browserDetails.timezone}</p>
-                                        </div>
-                                        <div>
-                                            <span className="text-sm text-muted-foreground">Local Time:</span>
-                                            <p className="font-medium">{browserDetails.localTime}</p>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
+                                <TableSectionHeader title="System & Device" icon={<ComputerIcon />} />
+                                <TableRow label="Operating System" value={`${browserDetails.os} ${browserDetails.osVersion}`} index={5} />
+                                <TableRow label="Architecture" value={browserDetails.architecture} index={6} />
+                                <TableRow label="Device Type" value={browserDetails.deviceType} index={7} />
+                                <TableRow label="Model" value={browserDetails.deviceModel} index={8} />
 
-                            {/* Action Buttons */}
-                            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                                <button
-                                    onClick={emailUs}
-                                    className="px-6 py-3 bg-brand-900 text-primary-foreground rounded-lg hover:bg-brand-700 transition-colors"
-                                >
-                                    Email Us
-                                </button>
-                                <a
-                                    href="/"
-                                    className="px-6 py-3 bg-secondary text-secondary-foreground rounded-lg hover:bg-secondary/90 transition-colors text-center"
-                                >
-                                    Back to Home
-                                </a>
-                            </div>
-                        </div>
-                    )}
+                                <TableSectionHeader title="Display & Graphics" icon={<MonitorIcon2 />} />
+                                <TableRow label="Screen Resolution" value={browserDetails.screenResolution} index={10} />
+                                <TableRow label="Viewport Size" value={browserDetails.viewportSize} index={11} />
+                                <TableRow label="Pixel Ratio" value={`${browserDetails.pixelRatio}x`} index={12} />
+                                <TableRow label="Color Depth" value={`${browserDetails.colorDepth} bits`} index={13} />
+                                <TableRow label="WebGL Support" value={
+                                    <>
+                                        {browserDetails.webglSupported ? '✅ WebGL' : '❌ WebGL'}
+                                        {browserDetails.webgl2Supported ? ' ✅ WebGL2' : ' ❌ WebGL2'}
+                                    </>
+                                } index={14} />
+
+                                <TableSectionHeader title="Hardware & Network" icon={<ZapIcon />} />
+                                <TableRow label="CPU Cores" value={browserDetails.hardwareConcurrency} index={16} />
+                                <TableRow label="Device Memory" value={browserDetails.deviceMemory ? `${browserDetails.deviceMemory} GB` : ''} index={17} />
+                                <TableRow label="Online Status" value={browserDetails.onlineStatus ? '🟢 Online' : '🔴 Offline'} index={18} />
+                                <TableRow label="IP Address" value={browserDetails.ipAddress} index={19} />
+                                <TableRow label="Connection" value={browserDetails.effectiveType} index={20} />
+                                <TableRow label="Downlink" value={browserDetails.downlink ? `${browserDetails.downlink} Mbps` : ''} index={21} />
+                                <TableRow label="RTT" value={browserDetails.rtt ? `${browserDetails.rtt} ms` : ''} index={22} />
+
+                                <TableSectionHeader title="Security & Privacy" icon={<ShieldIcon />} />
+                                <TableRow label="JavaScript Enabled" value={browserDetails.javascriptEnabled ? '✅ Enabled' : '❌ Disabled'} index={24} />
+                                <TableRow label="Cookies Enabled" value={browserDetails.cookiesEnabled ? '✅ Enabled' : '❌ Disabled'} index={25} />
+                                <TableRow label="Third-Party Cookies" value={browserDetails.thirdPartyCookiesEnabled ? '✅ Enabled' : '❌ Blocked'} index={26} />
+                                <TableRow label="Do Not Track" value={browserDetails.doNotTrack || 'Not set'} index={27} />
+                                <TableRow label="Private Mode" value={browserDetails.privateMode ? '🕵️ Yes' : '👁️ No'} index={28} />
+                                <TableRow label="Ad Blocker" value={browserDetails.adBlockerDetected ? '🛡️ Detected' : '❌ None'} index={29} />
+
+                                <TableSectionHeader title="Advanced Details" icon={<SettingsIcon />} />
+                                <TableRow label="Language" value={browserDetails.language} index={31} />
+                                <TableRow label="Timezone" value={browserDetails.timezone} index={32} />
+                                <TableRow label="Local Storage" value={browserDetails.localStorageAvailable ? '✅ Available' : '❌ Blocked'} index={33} />
+                                <TableRow label="Page Load Time" value={`${browserDetails.loadTime.toFixed(2)} ms`} index={34} />
+                                {browserDetails.geolocation && (
+                                    <>
+                                        <TableRow
+                                            label="Location"
+                                            value={
+                                                browserDetails.geolocation.locationName && browserDetails.geolocation.locationName !== 'Unknown Location'
+                                                    ? browserDetails.geolocation.locationName
+                                                    : `${browserDetails.geolocation.latitude.toFixed(4)}, ${browserDetails.geolocation.longitude.toFixed(4)}`
+                                            }
+                                            index={35}
+                                        />
+                                        <TableRow label="Location Accuracy" value={`±${browserDetails.geolocation.accuracy.toFixed(0)}m`} index={36} />
+                                    </>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </main>
             <Footer />
         </div>
     );
-} 
+}
