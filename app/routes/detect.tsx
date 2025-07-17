@@ -9,6 +9,44 @@ import { useState, useCallback, useRef } from "react";
 
 // --- Helper Components for the new table layout ---
 
+export function meta() {
+    return [
+        { title: "Detect Your Browser Details – BrowserDetect by EPYC" },
+        {
+            name: "description",
+            content:
+                "View full browser and system information, copy a shareable link, or send it via email. Powered by BrowserDetect from EPYC.",
+        },
+        {
+            property: "og:title",
+            content: "Detect Your Browser Details – BrowserDetect by EPYC",
+        },
+        {
+            property: "og:description",
+            content:
+                "View full browser and system information, copy a shareable link, or send it via email. Powered by BrowserDetect from EPYC.",
+        },
+        {
+            name: "twitter:card",
+            content: "summary",
+        },
+        {
+            name: "twitter:title",
+            content: "Detect Your Browser Details – BrowserDetect by EPYC",
+        },
+        {
+            name: "twitter:description",
+            content:
+                "Use BrowserDetect to inspect and share your browser and system data for debugging or support purposes.",
+        },
+        {
+            rel: "canonical",
+            href: "https://browserdetect.epyc.in/detect",
+        },
+    ];
+}
+
+
 // Table Section Header Component
 const TableSectionHeader = ({ title, icon }: { title: string; icon: string; }) => (
     <tr className="bg-muted/40 border-t-2 border-gray-200 border-muted">
@@ -34,9 +72,9 @@ const TableRow = ({ label, value }: { label: string; value: React.ReactNode; }) 
 
 // Notification Component
 const Notification = ({ message, type, onClose }: { message: string; type: 'success' | 'error' | 'info'; onClose: () => void }) => {
-    const bgColor = type === 'success' ? 'bg-green-500' : type === 'error' ? 'bg-red-500' : 'bg-blue-500';
+    const bgColor = type === 'success' ? 'bg-green-700' : type === 'error' ? 'bg-red-700' : 'bg-blue-500';
     const icon = type === 'success' ? '✅' : type === 'error' ? '❌' : 'ℹ️';
-    
+
     return (
         <div className={`fixed top-4 right-4 ${bgColor} text-white px-6 py-3 rounded-lg shadow-lg z-50 flex items-center gap-2 max-w-md animate-in slide-in-from-right-2 fade-in duration-300`}>
             <span>{icon}</span>
@@ -169,7 +207,7 @@ export default function Detect() {
             <div style="max-width: 800px; margin: 0 auto; background-color: white; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
                 
                 <!-- Header Section -->
-                <div style="background: linear-gradient(135deg, #1f4037 0%, #2d5f3f 100%); color: white; padding: 30px 20px; text-align: center;">
+                <div style="background: #183228; color: white; padding: 30px 20px; text-align: center;">
                     <div style="display: inline-flex; align-items: center; justify-content: center; margin-bottom: 15px;">
                         <h1 style="margin: 0; font-size: 28px; font-weight: bold;">EPYC Browser Detect</h1>
                     </div>
@@ -456,10 +494,10 @@ export default function Detect() {
                     <tr style="border-bottom: 1px solid #e0e0e0;">
                         <td style="padding: 12px 20px; font-weight: 600; color: #555; background-color: #fafafa;">Location</td>
                         <td style="padding: 12px 20px; color: #333;">
-                            ${details.geolocation.locationName && details.geolocation.locationName !== 'Unknown Location' 
-                                ? details.geolocation.locationName 
-                                : `${details.geolocation.latitude.toFixed(4)}, ${details.geolocation.longitude.toFixed(4)}`
-                            }
+                            ${details.geolocation.locationName && details.geolocation.locationName !== 'Unknown Location'
+                    ? details.geolocation.locationName
+                    : `${details.geolocation.latitude.toFixed(4)}, ${details.geolocation.longitude.toFixed(4)}`
+                }
                         </td>
                     </tr>
                     <tr style="border-bottom: 1px solid #e0e0e0;">
@@ -498,17 +536,17 @@ export default function Detect() {
     // Send email via Express backend
     const emailUs = async () => {
         if (!browserDetails) return;
-        
+
         setIsEmailSending(true);
         showNotification('Sending email...', 'info');
 
         try {
             const emailBody = generateEmailBody(browserDetails);
-            
+
             // TODO: Add support for multiple recipients later
             // const recipients = ['manishpandeycareer@gmail.com', 'support@epyc.com'];
             const recipients = ['manishpandeycareer@gmail.com'];
-            
+
             const response = await fetch('http://localhost:3001/send-email', {
                 method: 'POST',
                 headers: {
@@ -627,7 +665,7 @@ export default function Detect() {
                     <div className="flex flex-col sm:flex-row gap-4 justify-center my-12">
                         <button
                             onClick={copyToClipboard}
-                            className="inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 text-primary-foreground h-9 rounded-md px-3 bg-gradient-to-br from-brand-900 to-brand-800 hover:from-brand-800 hover:to-brand-900 min-w-30 shadow-elegant hover:shadow-glow transition-all duration-300 text-white cursor-pointer"
+                            className="inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 text-primary-foreground h-9 rounded-md px-3 bg-brand-primary hover:bg-brand-hover min-w-30 shadow-elegant hover:shadow-glow transition-all duration-300 text-white cursor-pointer"
                         >
                             <CopyIcon />
                             {copied ? "Copied to Clipboard!" : "Copy Share Link"}
@@ -635,7 +673,7 @@ export default function Detect() {
                         <button
                             onClick={emailUs}
                             disabled={isEmailSending}
-                            className={`inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 text-primary-foreground h-9 rounded-md px-3 bg-gradient-to-br from-brand-900 to-brand-800 hover:from-brand-800 hover:to-brand-900 min-w-30 shadow-elegant hover:shadow-glow transition-all duration-300 text-white cursor-pointer ${isEmailSending ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            className={`inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 text-primary-foreground h-9 rounded-md px-3 bg-brand-primary hover:bg-brand-hover min-w-30 shadow-elegant hover:shadow-glow transition-all duration-300 text-white cursor-pointer ${isEmailSending ? 'opacity-50 cursor-not-allowed' : ''}`}
                         >
                             {isEmailSending ? (
                                 <>
@@ -649,21 +687,14 @@ export default function Detect() {
                                 </>
                             )}
                         </button>
-                        <button
-                            onClick={() => navigate('/')}
-                            className="px-6 bg-secondary text-secondary-foreground rounded-lg hover:bg-secondary/90 transition-colors cursor-pointer hover:underline inline-flex items-center justify-center gap-2"
-                        >
-                            <HomeIcon />
-                            Back to Home
-                        </button>
                     </div>
 
                     {/* Notification */}
                     {notification && (
-                        <Notification 
-                            message={notification.message} 
-                            type={notification.type} 
-                            onClose={() => setNotification(null)} 
+                        <Notification
+                            message={notification.message}
+                            type={notification.type}
+                            onClose={() => setNotification(null)}
                         />
                     )}
 
@@ -692,7 +723,7 @@ export default function Detect() {
                                         {browserDetails.webgl2Supported ? ' ✅ WebGL2' : ' ❌ WebGL2'}
                                     </>
                                 } />
-                                
+
                                 <TableSectionHeader title="Hardware & Network" icon="⚡" />
                                 <TableRow label="CPU Cores" value={browserDetails.hardwareConcurrency} />
                                 <TableRow label="Device Memory" value={browserDetails.deviceMemory ? `${browserDetails.deviceMemory} GB` : ''} />
@@ -709,7 +740,7 @@ export default function Detect() {
                                 <TableRow label="Do Not Track" value={browserDetails.doNotTrack || 'Not set'} />
                                 <TableRow label="Private Mode" value={browserDetails.privateMode ? '🕵️ Yes' : '👁️ No'} />
                                 <TableRow label="Ad Blocker" value={browserDetails.adBlockerDetected ? '🛡️ Detected' : '❌ None'} />
-                                
+
                                 <TableSectionHeader title="Advanced Details" icon="⚙️" />
                                 <TableRow label="Language" value={browserDetails.language} />
                                 <TableRow label="Timezone" value={browserDetails.timezone} />

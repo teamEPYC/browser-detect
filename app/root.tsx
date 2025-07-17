@@ -29,6 +29,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <link rel="icon" href="https://cdn.prod.website-files.com/66445dc4463de54bfd7fe2cf/6669534e971bb780fb08bfba_favicon.png" type="image/png" />
         <Meta />
         <Links />
       </head>

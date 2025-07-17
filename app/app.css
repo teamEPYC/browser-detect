@@ -4,11 +4,28 @@
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif,
     "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
   
-  --color-brand-900: hsl(155 59% 15%);  /* primary dark */
-  --color-brand-800: hsl(155 59% 25%);  /* gradient end */
-  --color-brand-700: hsl(155 59% 35%);  /* hover state */
-  --color-brand-600: hsl(155 59% 45%);  /* lighter variations */
-  --color-brand-500: hsl(155 59% 55%);  /* mid tone */
+  --color-brand-900: #183228;  /* primary brand color */
+  --color-brand-800: #183228;  /* same as brand for consistency */
+  --color-brand-700: #971c40;  /* hover state */
+  --color-brand-600: #183228;  /* lighter variations */
+  --color-brand-500: #183228;  /* mid tone */
+  
+  /* Custom brand colors */
+  --color-brand-primary: #183228;
+  --color-brand-hover: #971c40;
+}
+
+/* Custom utility classes */
+.bg-brand-primary {
+  @apply bg-[#183228];
+}
+
+.bg-brand-hover {
+  @apply bg-[#971c40];
+}
+
+.hover\:bg-brand-hover:hover {
+  @apply bg-[#971c40];
 }
 
 html,
