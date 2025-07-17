@@ -4,7 +4,6 @@
 # React Router
 /.react-router/
 /build/
-/.env
 
 /backend/build/
 /backend/node_modules/
