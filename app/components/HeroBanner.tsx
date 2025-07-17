@@ -11,7 +11,7 @@ export default function HeroBanner() {
                 <div className="absolute bottom-32 right-16 w-32 h-32 bg-brand-600/30 rounded-full blur-2xl animate-pulse" style={{ animationDelay: "1s" }}></div>
                 <div className="absolute top-1/2 left-1/4 w-16 h-16 bg-brand-900/25 rounded-full blur-lg animate-pulse" style={{ animationDelay: "2s" }}></div>
             </div>
-            <div className="relative z-10 container mx-auto px-4 md:px-12 pt-20 pb-16">
+            <div className="relative z-10 container mx-auto px-4 md:px-12 pt-32 lg:pt-20 pb-16">
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-center">
                     <div className="text-center lg:text-left space-y-8 animate-fade-in">
                         <div className="flex justify-center lg:justify-start space-x-4 mb-6">
