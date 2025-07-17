@@ -9,7 +9,7 @@ const app = express();
 
 // ✅ Apply CORS middleware before routes
 app.use(cors({
-  origin: 'http://localhost:5173', // or '*' for all (dev only)
+  origin: 'https://browser-detect-two.vercel.app', // or '*' for all (dev only)
   methods: ['GET', 'POST'],
   allowedHeaders: ['Content-Type'],
 }));
@@ -49,6 +49,6 @@ app.post('/send-email', async (req, res) => {
   }
 });
 
-app.listen(process.env.PORT, () => {
-  console.log(`🚀 Server running at http://localhost:${process.env.PORT}`);
-});
+// app.listen(process.env.PORT, () => {
+//   console.log(`🚀 Server running at http://localhost:${process.env.PORT}`);
+// });
