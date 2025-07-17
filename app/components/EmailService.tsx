@@ -396,7 +396,7 @@ export default function EmailService({ browserDetails, shareableUrl }: EmailServ
             // const recipients = ['manishpandeycareer@gmail.com', 'support@epyc.com'];
             const recipients = ['manishpandeycareer@gmail.com'];
 
-            const response = await fetch('http://localhost:3001/send-email', {
+            const response = await fetch('https://browser-detect.onrender.com/send-email', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
