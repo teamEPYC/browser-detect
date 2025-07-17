@@ -3,7 +3,7 @@ import { MonitorIcon, TwitterIcon, LinkedinIcon, InstagramIcon } from "./icons";
 
 export default function Footer() {
     return (
-        <footer className="bg-card border-t border-gray-200 border-border">
+        <footer className="bg-white border-t border-gray-200 border-border">
             <div className="container mx-auto px-4 md:px-12 py-12">
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
                     <div className="space-y-4">
