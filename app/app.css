@@ -1,4 +1,182 @@
 @import "tailwindcss";
+@font-face {
+  font-family: TT Rationalist;
+  src: url(https://cdn.prod.website-files.com/66445dc4463de54bfd7fe2cf/66446b46f0243fbbbf6b58f6_TT%20Rationalist%20Trial%20Medium.ttf)
+    format("truetype");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: TT Rationalist;
+  src: url(https://cdn.prod.website-files.com/66445dc4463de54bfd7fe2cf/6644959450e6b951c4fae940_TT%20Rationalist%20Trial%20Normal.ttf)
+    format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: TT Rationalist;
+  src: url(https://cdn.prod.website-files.com/66445dc4463de54bfd7fe2cf/6649db1422d36f9b5f9dcded_TT%20Rationalist%20Trial%20Light.ttf)
+    format("truetype");
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+
+
+@font-face {
+  font-family: TT Norms Pro Serif;
+  src: url(https://cdn.prod.website-files.com/66445dc4463de54bfd7fe2cf/667ade735908ec3706362445_TTNormsProSerif-Thin.ttf)
+    format("truetype");
+  font-weight: 100;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: TT Norms Pro Serif;
+  src: url(https://cdn.prod.website-files.com/66445dc4463de54bfd7fe2cf/667ade73b66db26e6ea49431_TTNormsProSerif-ThinItalic.ttf)
+    format("truetype");
+  font-weight: 100;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: TT Norms Pro Serif;
+  src: url(https://cdn.prod.website-files.com/66445dc4463de54bfd7fe2cf/667ade73077e6595047f1182_TTNormsProSerif-ExtraLightItalic.ttf)
+    format("truetype");
+  font-weight: 200;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: TT Norms Pro Serif;
+  src: url(https://cdn.prod.website-files.com/66445dc4463de54bfd7fe2cf/667ade7366fc44289ea0bd24_TTNormsProSerif-ExtraLight.ttf)
+    format("truetype");
+  font-weight: 200;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: TT Norms Pro Serif;
+  src: url(https://cdn.prod.website-files.com/66445dc4463de54bfd7fe2cf/667ade73ebbcacb8efb668a6_TTNormsProSerif-LightItalic.ttf)
+    format("truetype");
+  font-weight: 300;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: TT Norms Pro Serif;
+  src: url(https://cdn.prod.website-files.com/66445dc4463de54bfd7fe2cf/667ade73522b62167caee2fc_TTNormsProSerif-Light.ttf)
+    format("truetype");
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: TT Norms Pro Serif;
+  src: url(https://cdn.prod.website-files.com/66445dc4463de54bfd7fe2cf/667add0d7428187de40f9824_TTNormsProSerif-Regular.ttf)
+    format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: TT Norms Pro Serif;
+  src: url(https://cdn.prod.website-files.com/66445dc4463de54bfd7fe2cf/667ade73f6dfe5a03e1782f5_TTNormsProSerif-Italic.ttf)
+    format("truetype");
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: TT Norms Pro Serif;
+  src: url(https://cdn.prod.website-files.com/66445dc4463de54bfd7fe2cf/664af6c5b9219da108df2e72_TTNormsProSerif-Normal.ttf)
+    format("truetype");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: TT Norms Pro Serif;
+  src: url(https://cdn.prod.website-files.com/66445dc4463de54bfd7fe2cf/667ade746286f67a43dd52ae_TTNormsProSerif-NormalItalic.ttf)
+    format("truetype");
+  font-weight: 500;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: TT Norms Pro Serif;
+  src: url(https://cdn.prod.website-files.com/66445dc4463de54bfd7fe2cf/667ade74e4d72d4669c381a5_TTNormsProSerif-MediumItalic.ttf)
+    format("truetype");
+  font-weight: 600;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: TT Norms Pro Serif;
+  src: url(https://cdn.prod.website-files.com/66445dc4463de54bfd7fe2cf/667add30d528e588c632476c_TTNormsProSerif-Medium.ttf)
+    format("truetype");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: TT Norms Pro Serif;
+  src: url(https://cdn.prod.website-files.com/66445dc4463de54bfd7fe2cf/667ade73f1b9a561076c4c0b_TTNormsProSerif-DemiBold.ttf)
+    format("truetype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: TT Norms Pro Serif;
+  src: url(https://cdn.prod.website-files.com/66445dc4463de54bfd7fe2cf/667ade72b66db26e6ea493e5_TTNormsProSerif-DemiBoldItalic.ttf)
+    format("truetype");
+  font-weight: 700;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: TT Norms Pro Serif;
+  src: url(https://cdn.prod.website-files.com/66445dc4463de54bfd7fe2cf/667ade733714b63a23e5c6f7_TTNormsProSerif-BoldItalic.ttf)
+    format("truetype");
+  font-weight: 800;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: TT Norms Pro Serif;
+  src: url(https://cdn.prod.website-files.com/66445dc4463de54bfd7fe2cf/667ade738a19f9ec6445baf1_TTNormsProSerif-Bold.ttf)
+    format("truetype");
+  font-weight: 800;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: TT Norms Pro Serif;
+  src: url(https://cdn.prod.website-files.com/66445dc4463de54bfd7fe2cf/667ade73a06c8f4531684938_TTNormsProSerif-ExtraBold.ttf)
+    format("truetype");
+  font-weight: 900;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: TT Norms Pro Serif;
+  src: url(https://cdn.prod.website-files.com/66445dc4463de54bfd7fe2cf/667ade73f95d2af2a83da9ff_TTNormsProSerif-ExtraBoldItalic.ttf)
+    format("truetype");
+  font-weight: 900;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: TT Norms;
+  src: url(https://cdn.prod.website-files.com/66445dc4463de54bfd7fe2cf/66446b60758170014484a138_TTNorms-Regular.otf)
+    format("opentype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
 
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif,
@@ -6,31 +184,36 @@
   
   --color-brand-900: #183228;  /* primary brand color */
   --color-brand-800: #183228;  /* same as brand for consistency */
-  --color-brand-700: #971c40;  /* hover state */
+  --color-brand-700: #b91646;  /* hover state */
   --color-brand-600: #183228;  /* lighter variations */
   --color-brand-500: #183228;  /* mid tone */
+  --color-brand-light: #fff0d0; 
   
   /* Custom brand colors */
   --color-brand-primary: #183228;
   --color-brand-hover: #971c40;
+  --color-alternate-row: #edededc4; 
+
+  --font-tt-rationalist: "TT Rationalist", serif;
+  --font-tt-norms-pro-serif: "TT Norms Pro Serif", serif;
 }
 
 /* Custom utility classes */
-.bg-brand-primary {
+/* .bg-brand-primary {
   @apply bg-[#183228];
 }
 
 .bg-brand-hover {
-  @apply bg-[#971c40];
-}
+  @apply bg-brand-700;
+} */
 
-.hover\:bg-brand-hover:hover {
-  @apply bg-[#971c40];
-}
+/* .hover\:bg-brand-hover:hover {
+  @apply bg-brand-700;
+} */
 
-.bg-alternate-row {
+/* .bg-alternate-row {
   @apply bg-[#edededc4];
-}
+} */
 
 html,
 body {
