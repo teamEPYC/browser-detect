@@ -3,6 +3,8 @@ import HeroBanner from "../components/HeroBanner";
 import WhyBuild from "../components/WhyBuild";
 import HowItWorks from "../components/HowItWorks";
 import Footer from "../components/Footer";
+import OurBrands from "~/components/OurBrands";
+import About from "~/components/About";
 
 export function meta() {
     return [
@@ -49,6 +51,8 @@ export default function Home() {
                 <HeroBanner />
                 <WhyBuild />
                 <HowItWorks />
+                <About />
+                <OurBrands />
             </main>
             <Footer />
         </div>

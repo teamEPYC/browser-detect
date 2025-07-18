@@ -265,7 +265,7 @@ export default function EmailService({ browserDetails, shareableUrl }: EmailServ
                     </tr>
                     <tr style="border-bottom: 1px solid #e0e0e0;">
                         <td style="padding: 12px 20px; font-weight: 600; color: #555; background-color: #edededc4;">Private Mode</td>
-                        <td style="padding: 12px 20px; color: #333;">${formatBoolean(details.privateMode, 'Private Mode', 'Normal Mode')}</td>
+                        <td style="padding: 12px 20px; color: #333;">${formatBoolean(details.privateMode, ' Yes ', ' - ')}</td>
                     </tr>
                     <tr style="border-bottom: 1px solid #e0e0e0;">
                         <td style="padding: 12px 20px; font-weight: 600; color: #555; background-color: #fafafa;">Ad Blocker</td>
@@ -429,11 +429,11 @@ export default function EmailService({ browserDetails, shareableUrl }: EmailServ
             <button
                 onClick={emailUs}
                 disabled={isEmailSending}
-                className={`inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 text-primary-foreground h-9 rounded-md px-3 bg-brand-primary hover:bg-brand-hover min-w-30 shadow-elegant hover:shadow-glow transition-all duration-300 text-white cursor-pointer ${isEmailSending ? 'opacity-50 cursor-not-allowed' : ''}`}
+                className={`inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 text-primary-foreground h-9 rounded-full px-4 bg-brand-700 hover:bg-brand-hover min-w-30 shadow-elegant hover:shadow-glow transition-all duration-300 text-white cursor-pointer font-tt-norms-pro-serif ${isEmailSending ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
                 {isEmailSending ? (
                     <>
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white font-tt-norms-pro-serif"></div>
                         Sending...
                     </>
                 ) : (

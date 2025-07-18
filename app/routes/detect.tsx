@@ -5,7 +5,7 @@ import Footer from "../components/Footer";
 import EmailService from "../components/EmailService";
 import { saveBrowserDetection, getBrowserDetection } from "../lib/database";
 import { BrowserDetector, type ComprehensiveBrowserDetails } from "../lib/browser-detection";
-import { CopyIcon, HomeIcon, BrowserIcon, ComputerIcon, MonitorIcon2, ZapIcon, WifiIcon, ShieldIcon, SettingsIcon, DatabaseIcon, GlobeIcon2, PlugIcon, MapPinIcon } from "../components/icons";
+import { CopyIcon, BrowserIcon, ComputerIcon, MonitorIcon2, ZapIcon, ShieldIcon, SettingsIcon } from "../components/icons";
 import { useState, useCallback, useRef } from "react";
 
 // --- Helper Components for the new table layout ---
@@ -51,7 +51,7 @@ export function meta() {
 const TableSectionHeader = ({ title, icon }: { title: string; icon: React.ReactNode; }) => (
     <tr className="bg-muted/40 border-t-2 border-gray-200 border-muted">
         <th colSpan={2} className="p-4 text-left text-xl font-bold text-foreground">
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-4 font-tt-rationalist">
                 <span className="text-2xl">{icon}</span>
                 <span>{title}</span>
             </div>
@@ -64,7 +64,7 @@ const TableRow = ({ label, value, index }: { label: string; value: React.ReactNo
     if (value === null || value === undefined || value === '') return null;
     const isEven = index % 2 === 0;
     return (
-        <tr className={`border-b border-border border-gray-200 last:border-b-0 ${isEven ? 'bg-alternate-row' : 'bg-white'} hover:bg-brand-100/40 transition-colors`}>
+        <tr className={`border-b border-border border-gray-200 last:border-b-0 ${isEven ? 'bg-alternate-row' : 'bg-white'} hover:bg-brand-100/40 transition-colors font-tt-norms-pro-serif`}>
             <td className="p-4 font-semibold text-foreground w-1/3">{label}</td>
             <td className="p-4 text-muted-foreground break-all">{value}</td>
         </tr>
@@ -214,11 +214,11 @@ export default function Detect() {
                 <main className="flex items-center justify-center min-h-[60vh]">
                     <div className="text-center">
                         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-900 mx-auto mb-4"></div>
-                        <p className="text-lg text-muted-foreground">
+                        <p className="text-lg text-muted-foreground font-tt-rationalist">
                             {loaderData.type === 'existing' ? 'Loading browser details...' : 'Collecting comprehensive browser details...'}
                         </p>
-                        <p className="text-sm text-muted-foreground mt-2">
-                            Gathering {loaderData.type === 'new' ? '50+' : ''} data points about your browser and device
+                        <p className="text-sm text-muted-foreground mt-2 font-tt-norms-pro-serif">
+                            Gathering detailed technical insights from your browser and device.
                         </p>
                     </div>
                 </main>
@@ -234,10 +234,10 @@ export default function Detect() {
             <main className="container mx-auto px-4 py-16 md:px-12">
                 <div className="max-w-4xl mx-auto">
                     <div className="text-center mb-12 pt-12">
-                        <h1 className="text-4xl font-bold text-foreground mb-4">
+                        <h1 className="text-4xl font-bold text-foreground mb-4 font-tt-rationalist">
                             {loaderData.type === 'existing' ? 'Shared Browser Details' : 'Your Browser Details'}
                         </h1>
-                        <p className="text-lg text-muted-foreground">
+                        <p className="text-lg text-muted-foreground font-tt-norms-pro-serif">
                             {loaderData.type === 'existing'
                                 ? `Detected on ${new Date(loaderData.created_at).toLocaleString()}`
                                 : 'Complete technical profile for debugging and support'
@@ -248,7 +248,7 @@ export default function Detect() {
                     <div className="flex flex-col sm:flex-row gap-4 justify-center my-12">
                         <button
                             onClick={copyToClipboard}
-                            className="inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 text-primary-foreground h-9 rounded-md px-3 bg-brand-primary hover:bg-brand-hover min-w-30 shadow-elegant hover:shadow-glow transition-all duration-300 text-white cursor-pointer"
+                            className="inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 text-primary-foreground h-9 rounded-full px-4 bg-brand-700 hover:bg-brand-hover min-w-30 shadow-elegant hover:shadow-glow transition-all duration-300 text-white cursor-pointer font-tt-norms-pro-serif"
                         >
                             <CopyIcon />
                             {copied ? "Copied to Clipboard!" : "Copy Link"}
@@ -298,7 +298,7 @@ export default function Detect() {
                                 <TableRow label="Cookies Enabled" value={browserDetails.cookiesEnabled ? '✅ Enabled' : '❌ Disabled'} index={25} />
                                 <TableRow label="Third-Party Cookies" value={browserDetails.thirdPartyCookiesEnabled ? '✅ Enabled' : '❌ Blocked'} index={26} />
                                 <TableRow label="Do Not Track" value={browserDetails.doNotTrack || 'Not set'} index={27} />
-                                <TableRow label="Private Mode" value={browserDetails.privateMode ? '🕵️ Yes' : '👁️ No'} index={28} />
+                                <TableRow label="Private Mode" value={browserDetails.privateMode ? 'Yes' : '-'} index={28} />
                                 <TableRow label="Ad Blocker" value={browserDetails.adBlockerDetected ? '🛡️ Detected' : '❌ None'} index={29} />
 
                                 <TableSectionHeader title="Advanced Details" icon={<SettingsIcon />} />
