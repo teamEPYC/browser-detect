@@ -2,7 +2,7 @@ import SectionHeader from "./SectionHeader";
 
 export default function About() {
     return (
-        <section id="about" className="py-20 ">
+        <section id="about" className="py-20 bg-white">
             <SectionHeader
                 title="About EPYC"
                 description={<>
