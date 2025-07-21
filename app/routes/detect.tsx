@@ -1,11 +1,11 @@
-import { useLoaderData, useNavigate } from "react-router";
+import { Link, useLoaderData, useNavigate } from "react-router";
 import type { LoaderFunctionArgs } from "react-router";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import EmailService from "../components/EmailService";
 import { saveBrowserDetection, getBrowserDetection } from "../lib/database";
 import { BrowserDetector, type ComprehensiveBrowserDetails } from "../lib/browser-detection";
-import { CopyIcon, BrowserIcon, ComputerIcon, MonitorIcon2, ZapIcon, ShieldIcon, SettingsIcon } from "../components/icons";
+import { CopyIcon, BrowserIcon, ComputerIcon, MonitorIcon2, ZapIcon, ShieldIcon, SettingsIcon, MailIcon } from "../components/icons";
 import { useState, useCallback, useRef } from "react";
 
 // --- Helper Components for the new table layout ---
@@ -256,9 +256,30 @@ export default function Detect() {
 
                         {/* <EmailService browserDetails={browserDetails} shareableUrl={shareableUrl} /> */}
 
-                        <a href="mailto:founder@example.com?subject=Your%20Application%20to%20Accel%20Atoms&body=Hi%20there,%0A%0AThanks%20for%20applying.%20We’d%20like%20to%20schedule%20a%20call.%0A%0ABest%20regards,">Send Email</a>
-
-
+                        {/* Proper mailto: link with concise explanation and shareable link */}
+                        {browserDetails && shareableUrl && (() => {
+                            const subject = `Browser Detection Report - ${browserDetails.browser} on ${browserDetails.os}`;
+                            const body = [
+                                "Hi,",
+                                "",
+                                "Here is my browser detection report for your reference:",
+                                "",
+                                shareableUrl,
+                                "",
+                                "Best regards,"
+                            ].join('\n');
+                            return (
+                                <Link
+                                    to={`mailto:manishpandeycareer@gmail.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`}
+                                    className="inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 text-primary-foreground h-9 rounded-full px-4 bg-brand-700 hover:bg-brand-hover min-w-30 shadow-elegant hover:shadow-glow transition-all duration-300 text-white cursor-pointer font-tt-norms-pro-serif"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                >
+                                    <MailIcon />
+                                    Send Email
+                                </Link>
+                            );
+                        })()}
                     </div>
 
                     <div className="border border-gray-200 border-t-0 rounded-lg overflow-hidden">
