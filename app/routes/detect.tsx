@@ -254,7 +254,10 @@ export default function Detect() {
                             {copied ? "Copied to Clipboard!" : "Copy Link"}
                         </button>
 
-                        <EmailService browserDetails={browserDetails} shareableUrl={shareableUrl} />
+                        {/* <EmailService browserDetails={browserDetails} shareableUrl={shareableUrl} /> */}
+
+                        <a href="mailto:founder@example.com?subject=Your%20Application%20to%20Accel%20Atoms&body=Hi%20there,%0A%0AThanks%20for%20applying.%20We’d%20like%20to%20schedule%20a%20call.%0A%0ABest%20regards,">Send Email</a>
+
 
                     </div>
 
