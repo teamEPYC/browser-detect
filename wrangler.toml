@@ -1,4 +1,4 @@
-name = "browser-detect"
+name = "epyc-browser-detect"
 compatibility_date = "2024-10-31"
 main = "./workers/final-app.ts"
 compatibility_flags = ["nodejs_compat"]
