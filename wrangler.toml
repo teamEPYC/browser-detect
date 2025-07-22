@@ -1,0 +1,11 @@
+name = "browser-detect"
+compatibility_date = "2024-10-31"
+main = "./workers/final-app.ts"
+compatibility_flags = ["nodejs_compat"]
+
+[observability]
+enabled = true
+
+[assets]
+directory = "./dist/client"  # Point to the client build directory
+binding = "ASSETS"

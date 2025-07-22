@@ -4,8 +4,10 @@
 # React Router
 /.react-router/
 /build/
+/dist/
 
 /backend/build/
 /backend/node_modules/
 
 /backend/express
+/.wrangler

@@ -1,12 +1,11 @@
-import { Link, useLoaderData, useNavigate } from "react-router";
-import type { LoaderFunctionArgs } from "react-router";
+import { Link, useNavigate, useParams } from "react-router";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import EmailService from "../components/EmailService";
 import { saveBrowserDetection, getBrowserDetection } from "../lib/database";
 import { BrowserDetector, type ComprehensiveBrowserDetails } from "../lib/browser-detection";
 import { CopyIcon, BrowserIcon, ComputerIcon, MonitorIcon2, ZapIcon, ShieldIcon, SettingsIcon, MailIcon } from "../components/icons";
-import { useState, useCallback, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 
 // --- Helper Components for the new table layout ---
 
@@ -71,130 +70,70 @@ const TableRow = ({ label, value, index }: { label: string; value: React.ReactNo
     );
 };
 
-// Loader function - runs before component renders
-export async function loader({ params }: LoaderFunctionArgs) {
-    const { id } = params;
-
-    // If we have an ID, try to load existing detection
-    if (id) {
-        console.log('🔍 Loading existing detection:', id);
-        try {
-            const existingDetection = await getBrowserDetection(id);
-            if (existingDetection) {
-                return {
-                    type: 'existing' as const,
-                    data: existingDetection.detection_data,
-                    id: existingDetection.id,
-                    created_at: existingDetection.created_at,
-                    shareableUrl: `/detect/${id}` // Will be fixed on client-side
-                };
-            } else {
-                console.log('⚠️ Detection not found, will create new one');
-                return { type: 'new' as const };
-            }
-        } catch (error) {
-            console.error('Error loading detection:', error);
-            return { type: 'new' as const };
-        }
-    }
-
-    // No ID provided, create new detection
-    return { type: 'new' as const };
-}
-
-// Global flag to prevent multiple collections across all instances
-declare global {
-    interface Window {
-        browserDetectionInProgress?: boolean;
-    }
-}
-
 export default function Detect() {
-    const loaderData = useLoaderData<typeof loader>();
+    const { id } = useParams();
     const navigate = useNavigate();
-
-    // Protection flags
     const collectionStartedRef = useRef(false);
     const isCollectingRef = useRef(false);
+    const [browserDetails, setBrowserDetails] = useState<ComprehensiveBrowserDetails | null>(null);
+    const [shareableUrl, setShareableUrl] = useState("");
+    const [copied, setCopied] = useState(false);
+    const [isCollecting, setIsCollecting] = useState(!id);
+    const [notFound, setNotFound] = useState(false);
 
-    // Initialize state - for existing detections, set data immediately
-    const [browserDetails, setBrowserDetails] = useState<ComprehensiveBrowserDetails | null>(
-        loaderData.type === 'existing' ? loaderData.data as ComprehensiveBrowserDetails : null
-    );
-
-    // Initialize and start collection for new detections
-    const [, setInitialized] = useState(() => {
-        // Only run on client-side for new detections
-        if (typeof window !== 'undefined' &&
-            loaderData.type === 'new' &&
-            !collectionStartedRef.current &&
-            !window.browserDetectionInProgress) {
-
-            // Set protection flags immediately
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        if (id) {
+            (async () => {
+                try {
+                    const detection = await getBrowserDetection(id!);
+                    if (detection) {
+                        setBrowserDetails(detection.detection_data as ComprehensiveBrowserDetails);
+                        setShareableUrl(`${window.location.origin}/detect/${detection.id}`);
+                        setIsCollecting(false);
+                        setNotFound(false);
+                    } else {
+                        setNotFound(true);
+                        setIsCollecting(false);
+                    }
+                } catch (e) {
+                    setNotFound(true);
+                    setIsCollecting(false);
+                }
+            })();
+            return;
+        }
+        if (!id && (!collectionStartedRef.current && !window.browserDetectionInProgress)) {
             collectionStartedRef.current = true;
             isCollectingRef.current = true;
             window.browserDetectionInProgress = true;
-
-            // Start collection asynchronously (non-blocking)
             setTimeout(() => startBrowserDetection(), 0);
         }
-        return true;
-    });
+    }, [id]);
 
-    const [shareableUrl, setShareableUrl] = useState(() => {
-        if (loaderData.type === 'existing') {
-            const baseUrl = loaderData.shareableUrl;
-            // If we're on client-side and URL doesn't have domain, add it
-            if (typeof window !== 'undefined' && baseUrl && !baseUrl.startsWith('http')) {
-                return `${window.location.origin}${baseUrl}`;
-            }
-            return baseUrl;
-        }
-        return "";
-    });
-
-    const [copied, setCopied] = useState(false);
-    const [isCollecting, setIsCollecting] = useState(
-        loaderData.type === 'new' && !browserDetails
-    );
-
-    // Browser detection function (extracted from previous useEffect logic)
-    const startBrowserDetection = useCallback(async () => {
-        if (typeof window === 'undefined') return; // SSR guard
-
-        console.log('🔍 Starting comprehensive browser detection...');
-
+    const startBrowserDetection = async () => {
+        if (typeof window === 'undefined') return;
         try {
             const detector = BrowserDetector.getInstance();
             const details = await detector.collectAllDetails();
-
-            console.log('📊 Collected browser details:', details);
             setBrowserDetails(details);
-
-            // Save to database
             try {
                 const savedDetection = await saveBrowserDetection(details);
                 const newShareableUrl = `${window.location.origin}/detect/${savedDetection.id}`;
                 setShareableUrl(newShareableUrl);
-
-                // Update URL without page reload
                 window.history.replaceState({}, '', `/detect/${savedDetection.id}`);
-                console.log('✅ Saved to database with ID:', savedDetection.id);
             } catch (error) {
-                console.error('❌ Error saving to database:', error);
-                // Fallback URL with generated ID
                 const fallbackUrl = `${window.location.origin}/detect/${details.uniqueId}`;
                 setShareableUrl(fallbackUrl);
                 window.history.replaceState({}, '', `/detect/${details.uniqueId}`);
             }
         } catch (error) {
-            console.error('Error collecting browser details:', error);
+            // handle error
         } finally {
             setIsCollecting(false);
             isCollectingRef.current = false;
-            // Keep protection flags set to prevent any future attempts
         }
-    }, []); // No dependencies needed since we're not using this in useEffect
+    };
 
     const copyToClipboard = async () => {
         try {
@@ -206,28 +145,34 @@ export default function Detect() {
         }
     };
 
-    // Loading state - same as before
     if (isCollecting || !browserDetails) {
         return (
             <div className="min-h-screen bg-white">
                 <Header />
-                <main className="flex items-center justify-center min-h-[60vh]">
-                    <div className="text-center">
-                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-900 mx-auto mb-4"></div>
-                        <p className="text-lg text-muted-foreground font-tt-rationalist">
-                            {loaderData.type === 'existing' ? 'Loading browser details...' : 'Collecting comprehensive browser details...'}
-                        </p>
-                        <p className="text-sm text-muted-foreground mt-2 font-tt-norms-pro-serif">
-                            Gathering detailed technical insights from your browser and device.
-                        </p>
-                    </div>
+                <main className="container mx-auto px-4 py-16 md:px-12 flex flex-col items-center justify-center min-h-[60vh]">
+                    {notFound ? (
+                        <div className="text-center">
+                            <h1 className="text-2xl font-bold mb-4">Detection Not Found</h1>
+                            <p>The detection you are looking for does not exist.</p>
+                        </div>
+                    ) : (
+                        <div className="text-center">
+                            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-900 mx-auto mb-4"></div>
+                            <p className="text-lg text-muted-foreground font-tt-rationalist">
+                                {id ? 'Loading browser details...' : 'Collecting comprehensive browser details...'}
+                            </p>
+                            <p className="text-sm text-muted-foreground mt-2 font-tt-norms-pro-serif">
+                                Gathering detailed technical insights from your browser and device.
+                            </p>
+                        </div>
+                    )}
                 </main>
                 <Footer />
             </div>
         );
     }
 
-    // Main UI - with new "Table Report" layout
+    // Main UI
     return (
         <div className="min-h-screen bg-white">
             <Header />
@@ -235,16 +180,12 @@ export default function Detect() {
                 <div className="max-w-4xl mx-auto">
                     <div className="text-center mb-12 pt-12">
                         <h1 className="text-4xl font-bold text-foreground mb-4 font-tt-rationalist">
-                            {loaderData.type === 'existing' ? 'Shared Browser Details' : 'Your Browser Details'}
+                            {id ? 'Shared Browser Details' : 'Your Browser Details'}
                         </h1>
                         <p className="text-lg text-muted-foreground font-tt-norms-pro-serif">
-                            {loaderData.type === 'existing'
-                                ? `Detected on ${new Date(loaderData.created_at).toLocaleString()}`
-                                : 'Complete technical profile for debugging and support'
-                            }
+                            Complete technical profile for debugging and support
                         </p>
                     </div>
-
                     <div className="flex flex-col sm:flex-row gap-4 justify-center my-12">
                         <button
                             onClick={copyToClipboard}
@@ -253,10 +194,7 @@ export default function Detect() {
                             <CopyIcon />
                             {copied ? "Copied to Clipboard!" : "Copy Link"}
                         </button>
-
                         {/* <EmailService browserDetails={browserDetails} shareableUrl={shareableUrl} /> */}
-
-                        {/* Proper mailto: link with concise explanation and shareable link */}
                         {browserDetails && shareableUrl && (() => {
                             const subject = `Browser Detection Report - ${browserDetails.browser} on ${browserDetails.os}`;
                             const body = [
@@ -281,7 +219,6 @@ export default function Detect() {
                             );
                         })()}
                     </div>
-
                     <div className="border border-gray-200 border-t-0 rounded-lg overflow-hidden">
                         <table className="w-full text-sm">
                             <tbody>
@@ -289,13 +226,11 @@ export default function Detect() {
                                 <TableRow label="Browser" value={`${browserDetails.browser} ${browserDetails.browserVersion}`} index={1} />
                                 <TableRow label="Engine" value={browserDetails.browserEngine} index={2} />
                                 <TableRow label="User Agent" value={browserDetails.userAgent} index={3} />
-
                                 <TableSectionHeader title="System & Device" icon={<ComputerIcon />} />
                                 <TableRow label="Operating System" value={`${browserDetails.os} ${browserDetails.osVersion}`} index={5} />
                                 <TableRow label="Architecture" value={browserDetails.architecture} index={6} />
                                 <TableRow label="Device Type" value={browserDetails.deviceType} index={7} />
                                 <TableRow label="Model" value={browserDetails.deviceModel} index={8} />
-
                                 <TableSectionHeader title="Display & Graphics" icon={<MonitorIcon2 />} />
                                 <TableRow label="Screen Resolution" value={browserDetails.screenResolution} index={10} />
                                 <TableRow label="Viewport Size" value={browserDetails.viewportSize} index={11} />
@@ -307,7 +242,6 @@ export default function Detect() {
                                         {browserDetails.webgl2Supported ? ' ✅ WebGL2' : ' ❌ WebGL2'}
                                     </>
                                 } index={14} />
-
                                 <TableSectionHeader title="Hardware & Network" icon={<ZapIcon />} />
                                 <TableRow label="CPU Cores" value={browserDetails.hardwareConcurrency} index={16} />
                                 <TableRow label="Device Memory" value={browserDetails.deviceMemory ? `${browserDetails.deviceMemory} GB` : ''} index={17} />
@@ -316,7 +250,6 @@ export default function Detect() {
                                 <TableRow label="Connection" value={browserDetails.effectiveType} index={20} />
                                 <TableRow label="Downlink" value={browserDetails.downlink ? `${browserDetails.downlink} Mbps` : ''} index={21} />
                                 <TableRow label="RTT" value={browserDetails.rtt ? `${browserDetails.rtt} ms` : ''} index={22} />
-
                                 <TableSectionHeader title="Security & Privacy" icon={<ShieldIcon />} />
                                 <TableRow label="JavaScript Enabled" value={browserDetails.javascriptEnabled ? '✅ Enabled' : '❌ Disabled'} index={24} />
                                 <TableRow label="Cookies Enabled" value={browserDetails.cookiesEnabled ? '✅ Enabled' : '❌ Disabled'} index={25} />
@@ -324,7 +257,6 @@ export default function Detect() {
                                 <TableRow label="Do Not Track" value={browserDetails.doNotTrack || 'Not set'} index={27} />
                                 <TableRow label="Private Mode" value={browserDetails.privateMode ? 'Yes' : '-'} index={28} />
                                 <TableRow label="Ad Blocker" value={browserDetails.adBlockerDetected ? '🛡️ Detected' : '❌ None'} index={29} />
-
                                 <TableSectionHeader title="Advanced Details" icon={<SettingsIcon />} />
                                 <TableRow label="Language" value={browserDetails.language} index={31} />
                                 <TableRow label="Timezone" value={browserDetails.timezone} index={32} />
