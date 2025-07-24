@@ -4,13 +4,16 @@
   "type": "module",
   "scripts": {
     "build": "react-router build",
+    "build:worker": "npm run build",
     "dev": "react-router dev",
-    "start": "react-router-serve ./build/server/index.js",
-    "typecheck": "react-router typegen && tsc"
+    "dev:worker": "npm run build && wrangler dev",
+    "start": "react-router-serve ./dist/server/index.js",
+    "preview": "npm run build && vite preview",
+    "deploy": "powershell -ExecutionPolicy Bypass -File deploy.ps1",
+    "typegen": "wrangler types && react-router typegen",
+    "typecheck": "npm run typegen && tsc"
   },
   "dependencies": {
-    "@react-router/node": "^7.5.3",
-    "@react-router/serve": "^7.5.3",
     "@supabase/supabase-js": "^2.51.0",
     "@types/uuid": "^10.0.0",
     "isbot": "^5.1.27",
@@ -20,6 +23,8 @@
     "uuid": "^11.1.0"
   },
   "devDependencies": {
+    "@cloudflare/vite-plugin": "^1.9.6",
+    "@cloudflare/workers-types": "^4.20250722.0",
     "@react-router/dev": "^7.5.3",
     "@tailwindcss/vite": "^4.1.4",
     "@types/node": "^20",
@@ -28,6 +33,7 @@
     "tailwindcss": "^4.1.4",
     "typescript": "^5.8.3",
     "vite": "^6.3.3",
-    "vite-tsconfig-paths": "^5.1.4"
+    "vite-tsconfig-paths": "^5.1.4",
+    "wrangler": "^4.25.0"
   }
 }
