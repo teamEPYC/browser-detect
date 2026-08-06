@@ -19,13 +19,13 @@
     "isbot": "^5.1.27",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
-    "react-router": "^7.5.3",
+    "react-router": "^8.3.0",
     "uuid": "^11.1.0"
   },
   "devDependencies": {
     "@cloudflare/vite-plugin": "^1.9.6",
     "@cloudflare/workers-types": "^4.20250722.0",
-    "@react-router/dev": "^7.5.3",
+    "@react-router/dev": "^8.3.0",
     "@tailwindcss/vite": "^4.1.4",
     "@types/node": "^20",
     "@types/react": "^19.1.2",
